@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Mes Cours{% endblock %}
+{% block content %}
+
+<!-- Titre principal -->
+<h1 class="text-4xl font-extrabold mb-10 text-center bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+  Mes Cours
+</h1>
+
+<!-- Bouton d’ajout -->
+<div class="text-center mb-10">
+  <a href="{{ url_for('ui.upload') }}"
+     class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
+    ➕ Ajouter un document
+  </a>
+</div>
+
+{% if documents %}
+<!-- Grille des documents -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% for doc in documents %}
+  <div class="bg-white border border-blue-100 shadow-sm rounded-2xl p-5 flex flex-col justify-between 
+              hover:shadow-md hover:border-blue-300 transition duration-200 relative overflow-hidden">
+
+    <!-- Effet lumineux subtil -->
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50 opacity-0 hover:opacity-80 transition duration-500 rounded-2xl pointer-events-none"></div>
+
+    <!-- Contenu -->
+    <div class="relative z-10">
+      <!-- En-tête -->
+      <div class="mb-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-gray-800 truncate w-4/5">{{ doc.title }}</h3>
+          <span class="text-xs text-gray-400">{{ doc.created_at.strftime('%d/%m/%Y') }}</span>
+        </div>
+      </div>
+
+      <!-- Boutons d’action -->
+      <div class="flex justify-between items-center mt-4 pt-3 border-t border-gray-100 space-x-2">
+        {% set quiz_exists = doc.questions|length > 0 %}
+
+        {% if quiz_exists %}
+          <!-- Jouer activé -->
+          <a href="/quizzes/play/{{ doc.id }}" 
+            class="btn btn-green hover:brightness-105">
+            Jouer
+          </a>
+          <!-- Généré désactivé -->
+          <button disabled 
+                  class="btn btn-yellow opacity-60 cursor-not-allowed" 
+                  title="Quiz déjà généré">
+            Généré
+          </button>
+        {% else %}
+          <!-- Jouer désactivé -->
+          <button disabled 
+                  class="btn btn-green opacity-60 cursor-not-allowed" 
+                  title="Génère d’abord le quiz pour pouvoir jouer">
+            Jouer
+          </button>
+          <!-- Générer actif -->
+          <button data-generate="{{ doc.id }}" 
+                  class="btn btn-yellow hover:brightness-105">
+            Générer
+          </button>
+        {% endif %}
+
+        <!-- Supprimer -->
+        <button data-delete="{{ doc.id }}" 
+                class="btn btn-red hover:brightness-105">
+          Supprimer
+        </button>
+      </div>
+
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<p class="text-center text-gray-500 text-lg mt-10">
+  Aucun document pour le moment.<br>
+</p>
+{% endif %}
+
+{% endblock %}

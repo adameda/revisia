@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-lg border border-gray-100 animate-fade-in">
+  <h1 class="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+    Connexion
+  </h1>
+
+  <form method="POST" class="space-y-5">
+    <input type="email" name="email" placeholder="Email" required
+           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+    <input type="password" name="password" placeholder="Mot de passe" required
+           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+
+    <button type="submit"
+            class="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-lg shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
+      Se connecter
+    </button>
+  </form>
+
+  <p class="mt-6 text-center text-sm text-gray-600">
+    Pas encore de compte ? 
+    <a href="{{ url_for('auth.register') }}" class="text-blue-600 font-medium hover:underline">
+      Créer un compte
+    </a>
+  </p>
+</div>
+
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+</style>
+{% endblock %}

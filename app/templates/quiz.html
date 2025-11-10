@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Quiz — {{ quiz_title }}{% endblock %}
+{% block content %}
+<h1 class="text-3xl font-bold mb-6">{{ quiz_title }}</h1>
+
+{% if questions %}
+  <div class="space-y-6">
+    {% for q in questions %}
+    <div class="bg-white rounded-xl shadow p-4">
+      <p class="font-semibold mb-3">{{ loop.index }}. {{ q.question }}</p>
+      {% if q.choices %}
+      <ul class="space-y-1">
+        {% for choice in q.choices %}
+        <li class="border border-gray-200 rounded p-2 hover:bg-gray-50">
+          {{ choice }}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-gray-500">Aucune question associée à ce document.</p>
+{% endif %}
+
+<a href="/documents"
+   class="inline-block mt-8 text-primary hover:underline">← Retour à mes documents</a>
+{% endblock %}

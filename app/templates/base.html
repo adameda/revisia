@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Révis'IA{% endblock %} | Révis'IA</title>
+  <!-- Icône de l’onglet -->
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=3">
+  <meta name="theme-color" content="#2563eb">
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563eb',
+            accent: '#facc15',
+            softgray: '#f9fafb',
+            pastelgreen: '#bbf7d0',
+            pastelyellow: '#fef3c7',
+            pastelred: '#fecaca',
+            pastelblue: '#bfdbfe',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Styles personnalisés -->
+  <style>
+    .btn {
+      display: inline-block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 0.6rem;
+      width: 100px;
+      text-align: center;
+      transition: all 0.2s ease-in-out;
+    }
+    .btn-green {
+      background-color: #bbf7d0; color: #14532d;
+    }
+    .btn-green:hover {
+      background-color: #86efac;
+    }
+    .btn-yellow {
+      background-color: #fef3c7; color: #78350f;
+    }
+    .btn-yellow:hover {
+      background-color: #fde68a;
+    }
+    .btn-red {
+      background-color: #fecaca; color: #7f1d1d;
+    }
+    .btn-red:hover {
+      background-color: #fca5a5;
+    }
+    .btn-gray {
+      background-color: #e5e7eb; color: #374151;
+    }
+    .btn-gray:hover {
+      background-color: #d1d5db;
+    }
+
+    /* Navigation améliorée */
+    .nav-link {
+      position: relative;
+      transition: color 0.2s ease-in-out;
+    }
+    .nav-link::after {
+      content: "";
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0%;
+      height: 2px;
+      background-color: #2563eb;
+      transition: width 0.25s ease-in-out;
+    }
+    .nav-link:hover::after {
+      width: 100%;
+    }
+    .logo-glow::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 1rem;
+      background: linear-gradient(135deg, #3b82f6, #6366f1, #93c5fd);
+      opacity: 0.25;
+      filter: blur(8px);
+      transition: opacity 0.3s ease-in-out;
+  }
+  .logo-glow:hover::before {
+    opacity: 0.45;
+  }
+  </style>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-gray-800 flex flex-col min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white/90 backdrop-blur-md shadow-sm fixed w-full top-0 z-10 border-b border-gray-100">
+    <nav class="container mx-auto flex justify-between items-center px-6 py-3">
+      <a href="/" class="flex items-center gap-3 hover:opacity-90 transition">
+        <!-- Conteneur du logo -->
+        <div class="relative flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 via-blue-500 to-indigo-500 shadow-md logo-glow">
+          <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="logo Révis'IA" class="h-6 w-6 relative z-10">
+        </div>
+
+        <!-- Texte du logo -->
+        <span class="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500">
+          Révis’<span class="text-indigo-600">IA</span>
+        </span>
+      </a>
+
+      <!-- Liens de navigation -->
+      <div class="flex items-center space-x-6 text-sm font-medium">
+        <a href="{{ url_for('ui.show_documents') }}"
+          class="px-5 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
+          Cours
+        </a>
+
+        <a href="{{ url_for('ui.show_results') }}"
+          class="px-5 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
+          Résultats
+        </a>
+
+
+
+        {% if current_user.is_authenticated %}
+          <span class="text-gray-600">👋 {{ current_user.username }}</span>
+
+          <a href="{{ url_for('auth.logout') }}"
+            class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
+            Déconnexion
+          </a>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}"
+            class="border border-blue-500 text-blue-600 px-5 py-2 rounded-lg shadow-sm hover:bg-blue-50 transition transform hover:-translate-y-0.5">
+            🔑 Connexion
+          </a>
+          <a href="{{ url_for('auth.register') }}"
+            class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
+            ✍️ Inscription
+          </a>
+        {% endif %}
+      </div>
+
+    </nav>
+  </header>
+
+  <!-- Main -->
+  <main class="container mx-auto flex-1 mt-24 p-6">
+    {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+        <div class="max-w-md mx-auto mb-6">
+          {% for category, message in messages %}
+            <div class="p-3 rounded mb-2 text-sm
+                        {% if category == 'error' %}bg-red-100 text-red-700
+                        {% else %}bg-green-100 text-green-700{% endif %}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-gray-200 overflow-hidden py-6 mt-auto relative">
+    <div class="whitespace-nowrap animate-footer-scroll text-gray-600 text-sm font-medium">
+      <span class="mx-6">✨ &copy; {{ app_name }} {{ current_year }} — {{ app_tagline }}</span>
+    </div>
+  </footer>
+
+  <style>
+  @keyframes footerScroll {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  .animate-footer-scroll {
+    display: inline-block;
+    animation: footerScroll 25s linear infinite;
+  }
+  </style>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

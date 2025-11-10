@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Quiz — {{ title }}{% endblock %}
+{% block content %}
+<div id="quizContainer"
+     data-questions='{{ questions | tojson }}'
+     data-document-id="{{ document.id }}"
+     class="max-w-2xl mx-auto bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-8 text-center border border-gray-100 animate-fade-in">
+
+  <!-- Titre -->
+  <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent mb-2">
+    {{ title }}
+  </h1>
+
+  <!-- Progression et score -->
+  <div class="flex justify-between items-center text-sm text-gray-600 mb-4">
+    <p id="progress" class="font-medium"></p>
+    <p id="scoreDisplay" class="font-semibold">Score : 0</p>
+  </div>
+
+  <!-- Question -->
+  <div id="questionBox" class="mt-6 space-y-4 animate-fade-in"></div>
+
+  <!-- Bouton suivant -->
+  <button id="nextBtn"
+          class="hidden mt-8 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium px-8 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
+    Suivant →
+  </button>
+
+  <!-- Résultat -->
+  <div id="result" class="hidden text-center mt-10"></div>
+</div>
+
+<!-- Lien retour -->
+<div class="text-center mt-10">
+  <a href="/documents" 
+     class="inline-block bg-gray-100 text-gray-700 px-5 py-2 rounded-lg shadow-sm hover:bg-gray-200 transition">
+    ← Retour à mes documents
+  </a>
+</div>
+
+<!-- Animations CSS -->
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Effet sur les boutons de choix */
+.choice-btn {
+  transition: all 0.2s ease;
+}
+.choice-btn:hover {
+  background-color: #f3f4f6;
+  transform: translateY(-1px);
+}
+
+/* Feedback visuel */
+.correct {
+  background-color: #dcfce7 !important;
+  border-color: #22c55e !important;
+}
+.wrong {
+  background-color: #fee2e2 !important;
+  border-color: #ef4444 !important;
+}
+</style>
+{% endblock %}

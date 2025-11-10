@@ -1,0 +1,23 @@
+# Environnement virtuel
+.venv/
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Fichiers de test temporaires
+.pytest_cache/
+
+# Environnement / secrets
+.env
+
+# Base de données locale
+data.db
+
+# Dossiers de travail ou uploads
+uploads/
+outputs/
+samples/
+
+# Fichiers macOS
+.DS_Store

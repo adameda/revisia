@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Accueil{% endblock %}
+{% block content %}
+
+<div class="relative text-center mt-20 px-6">
+  <!-- Fond doux -->
+  <div class="absolute inset-0 bg-gradient-to-br from-blue-100 via-white to-indigo-100 opacity-60 blur-3xl"></div>
+
+  <div class="relative z-10">
+    <!-- Message de bienvenue -->
+    <h1 class="text-4xl md:text-5xl font-bold mb-4 opacity-0 animate-fade-in-gradient bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+      {% if current_user.is_authenticated %}
+        Heureux de te revoir, {{ current_user.username }} !
+      {% else %}
+        Bienvenue sur Révis'IA
+      {% endif %}
+    </h1>
+
+    <!-- Texte animé (inchangé) -->
+    <p class="text-gray-600 text-lg mb-8 h-6 overflow-hidden relative">
+      <span class="block animate-slide-text">
+        Importe tes notes de cours et laisse l’IA générer des quiz<br>
+        Renforce ta mémoire en rejouant tes quiz régulièrement<br>
+        Suis ta progression et mesure tes résultats
+      </span>
+    </p>
+
+    <!-- Boutons d’action -->
+    {% if current_user.is_authenticated %}
+      <a href="{{ url_for('ui.show_documents') }}"
+        class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
+        Voir mes documents
+      </a>
+    {% else %}
+      <div class="space-x-3">
+        <a href="{{ url_for('auth.register') }}"
+          class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
+          ✍️ Créer un compte
+        </a>
+        <a href="{{ url_for('auth.login') }}"
+          class="inline-block border border-blue-500 text-blue-600 px-6 py-2.5 rounded-lg shadow hover:bg-blue-50 transition transform hover:-translate-y-0.5">
+          🔑 Se connecter
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- SECTION CONCEPT : les 3 cartes -->
+<section class="relative z-10 container mx-auto mt-24 mb-16 px-6 grid gap-8 md:grid-cols-3 text-center">
+  <!-- Carte 1 -->
+  <div class="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition transform hover:-translate-y-1">
+    <div class="flex justify-center mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" />
+      </svg>
+    </div>
+    <h3 class="text-xl font-semibold mb-2 text-gray-800">1. Importe tes cours</h3>
+    <p class="text-gray-600">Téléverse tes fichiers Word. Le contenu essentiel sera extrait automatiquement pour créer tes quiz.</p>
+  </div>
+
+  <!-- Carte 2 -->
+  <div class="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition transform hover:-translate-y-1">
+    <div class="flex justify-center mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 3v1.5m0 15V21m9-9h-1.5M4.5 12H3m15.364-6.364l-1.06 1.06m-9.607 9.607l-1.06 1.06m11.667 0l-1.06-1.06m-9.606-9.606l-1.06-1.06M12 8.25l-1.5 3h3L12 15.75" />
+      </svg>
+    </div>
+    <h3 class="text-xl font-semibold mb-2 text-gray-800">2. Génère des quiz</h3>
+    <p class="text-gray-600">Grâce à l’IA, obtiens des quiz adaptés à tes cours pour t’aider à mémoriser et réviser efficacement.</p>
+  </div>
+
+  <!-- Carte 3 -->
+  <div class="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition transform hover:-translate-y-1">
+    <div class="flex justify-center mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 17l6-6 4 4 8-8" />
+      </svg>
+    </div>
+    <h3 class="text-xl font-semibold mb-2 text-gray-800">3. Suis ta progression</h3>
+    <p class="text-gray-600">Analyse ton évolution grâce à des graphiques clairs et mesure tes progrès sur chaque cours.</p>
+  </div>
+</section>
+
+<!-- Animations -->
+<style>
+@keyframes fadeInGradient {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+.animate-fade-in-gradient {
+  animation: fadeInGradient 1.2s ease-out forwards;
+}
+
+.bg-clip-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Texte animé */
+@keyframes slideText {
+  0%, 20% { transform: translateY(0); }
+  33%, 53% { transform: translateY(-1.5rem); }
+  66%, 86% { transform: translateY(-3rem); }
+  100% { transform: translateY(0); }
+}
+.animate-slide-text {
+  animation: slideText 9s ease-in-out infinite;
+  line-height: 1.5rem;
+}
+</style>
+
+{% endblock %}
