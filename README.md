@@ -1,4 +1,4 @@
-<h1 align="center">Révis’IA — Application de Quiz Intelligente</h1>
+<h1 align="center">Révis’IA — Application de Quiz Intelligente (V1)</h1>
 
 <p align="center">
   <img src="app/static/img/logo.svg" alt="Logo Révis’IA" width="100" style="border-radius: 12px;">
