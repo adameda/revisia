@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>Révis’IA</strong> est une application Flask qui transforme automatiquement tes cours en quiz interactifs à l’aide d’un modèle d’intelligence artificielle.<br>
-  Simple, intuitive et élégante — l’outil parfait pour réviser efficacement.
+  <strong>Révis’IA</strong> est une application Flask qui transforme automatiquement tes cours en quiz à l’aide d’un modèle d’intelligence artificielle.<br>
+  Simple et intuitive, l’application te permettra de revoir tes cours efficacement.
 </p>
 
 <hr>
@@ -117,7 +117,7 @@ http://127.0.0.1:8000
 
 <h2>☁️ V2 — Prochaines étapes</h2>
 <ul>
-  <li><strong>Déploiement en ligne</strong> sur une plateforme cloud (Render, Railway, ou Vercel)</li>
+  <li><strong>Déploiement en ligne</strong> sur une plateforme cloud (Railway)</li>
   <li><strong>Phase de test utilisateurs</strong> pour recueillir des retours sur l’expérience et les fonctionnalités</li>
   <li><strong>Amélioration de l’expérience d’apprentissage</strong> (mécanismes de quiz, feedbacks, interface, progression)</li>
 </ul>
