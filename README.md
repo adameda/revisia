@@ -96,20 +96,21 @@ User (1) ─── owns ─── (∞) Document ─── has ─── (∞) Q
 <h2>🚀 Lancer le projet en local</h2>
 
 <pre><code># 1️⃣ Cloner le projet
-git clone https://github.com/ton-utilisateur/revis-ia.git
-cd revis-ia
+git clone https://github.com/adameda/revisia.git
+cd revisia
 
-# 2️⃣ Créer un environnement virtuel
-python -m venv .venv
-source .venv/bin/activate   # ou .venv\Scripts\activate sous Windows
+# 2️⃣ Installer les dépendances avec UV
+uv sync
 
-# 3️⃣ Installer les dépendances
-pip install -r requirements.txt
+# 3️⃣ Activer l’environnement virtuel créé par UV
+source .venv/bin/activate   # macOS / Linux
+# ou
+.\.venv\Scripts\activate     # Windows
 
-# 4️⃣ Lancer l’application
+# 4️⃣ Lancer l’application Flask
 python run.py
 
-# 5️⃣ Accéder à l’app
+# 5️⃣ Accéder à l’app dans le navigateur
 http://127.0.0.1:8000
 </code></pre>
 
