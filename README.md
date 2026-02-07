@@ -1,12 +1,12 @@
-<h1 align="center">Révis’IA — Application de Quiz Intelligente</h1>
+<h1 align="center">Révis’IA — Application de Quiz Intelligente (V1)</h1>
 
 <p align="center">
   <img src="app/static/img/logo.svg" alt="Logo Révis’IA" width="100" style="border-radius: 12px;">
 </p>
 
 <p align="center">
-  <strong>Révis’IA</strong> est une application Flask qui transforme automatiquement tes cours en quiz interactifs à l’aide d’un modèle d’intelligence artificielle.<br>
-  Simple, intuitive et élégante — l’outil parfait pour réviser efficacement.
+  <strong>Révis’IA</strong> est une application Flask qui transforme automatiquement tes cours en quiz à l’aide d’un modèle d’intelligence artificielle.<br>
+  Simple et intuitive, l’application te permettra de revoir tes cours efficacement.
 </p>
 
 <hr>
@@ -96,20 +96,21 @@ User (1) ─── owns ─── (∞) Document ─── has ─── (∞) Q
 <h2>🚀 Lancer le projet en local</h2>
 
 <pre><code># 1️⃣ Cloner le projet
-git clone https://github.com/ton-utilisateur/revis-ia.git
-cd revis-ia
+git clone https://github.com/adameda/revisia.git
+cd revisia
 
-# 2️⃣ Créer un environnement virtuel
-python -m venv .venv
-source .venv/bin/activate   # ou .venv\Scripts\activate sous Windows
+# 2️⃣ Installer les dépendances avec UV
+uv sync
 
-# 3️⃣ Installer les dépendances
-pip install -r requirements.txt
+# 3️⃣ Activer l’environnement virtuel créé par UV
+source .venv/bin/activate   # macOS / Linux
+# ou
+.\.venv\Scripts\activate     # Windows
 
-# 4️⃣ Lancer l’application
+# 4️⃣ Lancer l’application Flask
 python run.py
 
-# 5️⃣ Accéder à l’app
+# 5️⃣ Accéder à l’app dans le navigateur
 http://127.0.0.1:8000
 </code></pre>
 
@@ -117,7 +118,7 @@ http://127.0.0.1:8000
 
 <h2>☁️ V2 — Prochaines étapes</h2>
 <ul>
-  <li><strong>Déploiement en ligne</strong> sur une plateforme cloud (Render, Railway, ou Vercel)</li>
+  <li><strong>Déploiement en ligne</strong> sur une plateforme cloud (Railway)</li>
   <li><strong>Phase de test utilisateurs</strong> pour recueillir des retours sur l’expérience et les fonctionnalités</li>
   <li><strong>Amélioration de l’expérience d’apprentissage</strong> (mécanismes de quiz, feedbacks, interface, progression)</li>
 </ul>
