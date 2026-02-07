@@ -29,6 +29,9 @@
     }
   </script>
 
+  <!-- Marked.js pour le rendu Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+
   <!-- Styles personnalisés -->
   <style>
     .btn {
@@ -65,6 +68,30 @@
     .btn-gray:hover {
       background-color: #d1d5db;
     }
+    .btn-blue {
+      background-color: #3b82f6; color: white;
+    }
+    .btn-blue:hover {
+      background-color: #2563eb;
+    }
+
+    /* Système de modal unifié */
+    .unified-modal {
+      backdrop-filter: blur(4px);
+    }
+    .unified-modal-content {
+      animation: modalSlideIn 0.2s ease-out;
+    }
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
     /* Navigation améliorée */
     .nav-link {
@@ -96,6 +123,134 @@
   }
   .logo-glow:hover::before {
     opacity: 0.45;
+  }
+
+  /* Styles pour le contenu Markdown */
+  .prose {
+    color: #374151;
+    max-width: none;
+  }
+  .prose h1 {
+    font-size: 2em;
+    font-weight: 800;
+    margin-top: 0;
+    margin-bottom: 0.8em;
+    line-height: 1.2;
+    color: #1f2937;
+    border-bottom: 3px solid #3b82f6;
+    padding-bottom: 0.3em;
+  }
+  .prose h2 {
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-top: 1.5em;
+    margin-bottom: 0.6em;
+    line-height: 1.3;
+    color: #374151;
+    border-bottom: 2px solid #93c5fd;
+    padding-bottom: 0.2em;
+  }
+  .prose h3 {
+    font-size: 1.25em;
+    font-weight: 600;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+    color: #4b5563;
+  }
+  .prose p {
+    margin-top: 0.8em;
+    margin-bottom: 0.8em;
+    line-height: 1.7;
+  }
+  .prose ul, .prose ol {
+    margin-top: 0.8em;
+    margin-bottom: 0.8em;
+    padding-left: 1.5em;
+  }
+  .prose li {
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
+    line-height: 1.6;
+  }
+  .prose ul > li {
+    list-style-type: disc;
+  }
+  .prose ol > li {
+    list-style-type: decimal;
+  }
+  .prose strong {
+    font-weight: 700;
+    color: #1f2937;
+  }
+  .prose em {
+    font-style: italic;
+    color: #4b5563;
+  }
+  .prose code {
+    background-color: #f3f4f6;
+    padding: 0.2em 0.4em;
+    border-radius: 0.25rem;
+    font-size: 0.9em;
+    font-family: 'Courier New', monospace;
+    color: #dc2626;
+  }
+  .prose pre {
+    background-color: #1f2937;
+    color: #f9fafb;
+    padding: 1em;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin-top: 1em;
+    margin-bottom: 1em;
+  }
+  .prose pre code {
+    background-color: transparent;
+    padding: 0;
+    color: #f9fafb;
+  }
+  .prose blockquote {
+    border-left: 4px solid #3b82f6;
+    padding-left: 1em;
+    margin-left: 0;
+    margin-top: 1em;
+    margin-bottom: 1em;
+    color: #6b7280;
+    font-style: italic;
+  }
+  .prose a {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  .prose a:hover {
+    color: #1d4ed8;
+  }
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin-top: 1em;
+    margin-bottom: 1em;
+  }
+  .prose hr {
+    border: none;
+    border-top: 2px solid #e5e7eb;
+    margin-top: 2em;
+    margin-bottom: 2em;
+  }
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1em;
+    margin-bottom: 1em;
+  }
+  .prose th, .prose td {
+    border: 1px solid #e5e7eb;
+    padding: 0.5em;
+    text-align: left;
+  }
+  .prose th {
+    background-color: #f3f4f6;
+    font-weight: 600;
   }
   </style>
 </head>
@@ -170,6 +325,29 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Système de modal unifié -->
+  <div id="unified-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 unified-modal">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 unified-modal-content">
+      <!-- Header -->
+      <div id="unified-modal-header" class="p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <div id="unified-modal-icon" class="flex-shrink-0"></div>
+          <h3 id="unified-modal-title" class="text-xl font-bold text-gray-800"></h3>
+        </div>
+      </div>
+      
+      <!-- Contenu -->
+      <div id="unified-modal-content" class="p-6">
+        <p id="unified-modal-message" class="text-gray-600"></p>
+      </div>
+      
+      <!-- Actions -->
+      <div id="unified-modal-actions" class="px-6 pb-6 pt-2 flex justify-end gap-3">
+        <!-- Boutons injectés dynamiquement -->
+      </div>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer class="bg-white border-t border-gray-200 overflow-hidden py-6 mt-auto relative">

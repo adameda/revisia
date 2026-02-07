@@ -2,72 +2,324 @@
 {% block title %}Mes Cours{% endblock %}
 {% block content %}
 
-<!-- Titre principal -->
-<h1 class="text-4xl font-extrabold mb-10 text-center bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
-  Mes Cours
-</h1>
-
-<!-- Bouton d’ajout -->
-<div class="text-center mb-10">
-  <a href="{{ url_for('ui.upload') }}"
-     class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
-    ➕ Ajouter un document
-  </a>
+<!-- Modal création de matière -->
+<div id="createSubjectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="backdrop-filter: blur(4px);">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-xl font-bold text-gray-800">Nouvelle matière</h3>
+      <button id="closeSubjectModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    
+    <form id="createSubjectForm">
+      <div class="mb-6">
+        <label for="subjectNameInput" class="block text-sm font-medium text-gray-700 mb-2">Nom de la matière</label>
+        <input type="text" 
+               id="subjectNameInput" 
+               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+               placeholder="Ex: Mathématiques, Histoire..."
+               required>
+      </div>
+      
+      <div class="flex gap-3">
+        <button type="button" 
+                id="cancelSubjectBtn"
+                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+          Annuler
+        </button>
+        <button type="submit" 
+                class="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:opacity-90 transition-all">
+          Créer
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
+<!-- Modal d'aperçu du cours -->
+<div id="courseModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="backdrop-filter: blur(4px);">
+  <div class="bg-white rounded-2xl shadow-2xl p-0 max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col transform transition-all">
+    <!-- En-tête de la modal -->
+    <div class="flex items-center justify-between p-6 border-b border-gray-200">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">📖</span>
+        <h3 id="courseModalTitle" class="text-2xl font-bold text-gray-800">Cours</h3>
+      </div>
+      <button id="closeCourseModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    
+    <!-- Contenu scrollable -->
+    <div class="flex-1 overflow-y-auto p-6">
+      <div id="courseContent" class="prose prose-blue max-w-none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de progression -->
+<div id="progressModal" class=" fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="backdrop-filter: blur(4px);">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+    <!-- Icône animée -->
+    <div class="flex justify-center mb-6">
+      <div class="relative">
+        <div class="w-20 h-20 border-4 border-blue-200 rounded-full"></div>
+        <div class="w-20 h-20 border-4 border-blue-600 rounded-full border-t-transparent absolute top-0 left-0 animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <span class="text-2xl">🤖</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Titre -->
+    <h3 class="text-2xl font-bold text-center mb-2 text-gray-800">Génération du quiz</h3>
+    
+    {% if mock_mode %}
+    <!-- Badge mode mock dans la modal -->
+    <div class="text-center mb-4">
+      <span class="inline-flex items-center px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
+        🧪 Mode test (instantané)
+      </span>
+    </div>
+    {% endif %}
+    
+    <!-- Message de statut -->
+    <p id="progressStatus" class="text-center text-gray-600 mb-6 text-sm">Analyse du cours en cours...</p>
+    
+    <!-- Barre de progression -->
+    <div class="mb-4">
+      <div class="bg-gray-200 rounded-full h-3 overflow-hidden">
+        <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between mt-2 text-xs text-gray-500">
+        <span id="progressPercent">0%</span>
+        <span id="progressInfo">Connexion à l'IA...</span>
+      </div>
+    </div>
+    
+    <!-- Info nombre de questions -->
+    <div id="questionsInfo" class="hidden text-center mt-4 p-3 bg-blue-50 rounded-lg">
+      <p class="text-sm text-blue-800">
+        <span class="font-semibold" id="questionCount">-</span> questions seront générées
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de changement de matière -->
+<div id="changeSubjectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="backdrop-filter: blur(4px);">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 relative">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-xl font-bold text-gray-800">Changer la matière</h3>
+      <button id="closeChangeSubjectModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <p class="text-sm text-gray-600 mb-4">Sélectionnez la nouvelle matière pour ce cours :</p>
+    
+    <!-- Liste des matières -->
+    <div class="space-y-2 max-h-96 overflow-y-auto">
+      {% for subject in subjects %}
+      <button class="subject-modal-option w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-3 border border-transparent hover:border-gray-300" 
+              data-subject-id="{{ subject.id }}"
+              style="color: {{ subject.color }};">
+        <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ subject.color }};"></span>
+        <span class="font-medium">{{ subject.name }}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Contenu principal -->
+<div class="max-w-7xl mx-auto">
+  <!-- En-tête avec titre et actions -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+        Mes Cours
+      </h1>
+      {% if mock_mode %}
+      <div class="inline-flex items-center px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold mt-2">
+        🧪 Mode test
+      </div>
+      {% endif %}
+    </div>
+    <div class="flex gap-3">
+      <button id="createSubjectBtn" 
+              class="px-4 py-2 bg-white border-2 border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition-all font-medium shadow-sm">
+        ➕ Nouvelle matière
+      </button>
+      <a href="{{ url_for('ui.upload', subject=current_filter if current_filter not in ['all', 'none', None] else '') }}"
+         class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition-all font-medium">
+        📄 Ajouter un cours
+      </a>
+    </div>
+  </div>
+  
+  <!-- Pills de filtrage des matières -->
+  <div class="mb-8 flex flex-wrap gap-2">
+    <a href="{{ url_for('ui.show_documents') }}"
+       data-subject-id="all"
+       class="inline-flex items-center px-4 py-2 rounded-full font-medium transition-all {% if not current_filter or current_filter == 'all' %}bg-blue-500 text-white shadow-md{% else %}bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300{% endif %}">
+      <span class="mr-1">📖</span>
+      <span>Tous</span>
+      <span class="count ml-2 {% if not current_filter or current_filter == 'all' %}bg-blue-600{% else %}bg-gray-200{% endif %} px-2 py-0.5 rounded-full text-xs">{{ total_docs }}</span>
+    </a>
+    
+    {% if subjects %}
+      {% for subject in subjects %}
+      <div class="inline-flex items-center px-4 py-2 rounded-full font-medium transition-all {% if current_filter == subject.id|string %}text-white shadow-md{% else %}bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300{% endif %} group relative"
+           data-subject-id="{{ subject.id }}"
+           style="{% if current_filter == subject.id|string %}background-color: {{ subject.color }};{% endif %}">
+        <a href="{{ url_for('ui.show_documents', subject=subject.id) }}" class="flex items-center">
+          <span class="w-2 h-2 rounded-full mr-2" style="background-color: {{ subject.color }};"></span>
+          <span>{{ subject.name }}</span>
+          <span class="count ml-2 px-2 py-0.5 rounded-full text-xs" style="{% if current_filter == subject.id|string %}background-color: {{ subject.color }}; filter: brightness(0.85);{% else %}background-color: #e5e7eb;{% endif %}">{{ subject.doc_count }}</span>
+        </a>
+        {% if subjects|length > 1 %}
+        <button class="delete-subject-btn ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black hover:bg-opacity-10 rounded-full"
+                data-subject-id="{{ subject.id }}"
+                data-subject-name="{{ subject.name }}"
+                data-subject-docs="{{ subject.doc_count }}"
+                title="Supprimer cette matière">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+  
+  <!-- Titre de la section -->
+  {% if current_filter and current_filter != 'all' %}
+    {% for subject in subjects %}
+      {% if current_filter == subject.id|string %}
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">
+          <span class="inline-block w-4 h-4 rounded-full mr-2" style="background-color: {{ subject.color }};"></span>
+          {{ subject.name }} ({{ documents|length }})
+        </h2>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">📖 Tous les cours ({{ documents|length }})</h2>
+  {% endif %}
+
 {% if documents %}
-<!-- Grille des documents -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Liste des documents (pleine largeur) -->
+<div id="documents-container" class="space-y-4">
   {% for doc in documents %}
-  <div class="bg-white border border-blue-100 shadow-sm rounded-2xl p-5 flex flex-col justify-between 
-              hover:shadow-md hover:border-blue-300 transition duration-200 relative overflow-hidden">
+  <div class="bg-white border border-blue-100 shadow-sm rounded-2xl p-5 
+              hover:shadow-md hover:border-blue-300 transition duration-200 relative overflow-hidden"
+       data-doc-id="{{ doc.id }}"
+       data-word-count="{{ doc.word_count }}">
 
     <!-- Effet lumineux subtil -->
     <div class="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50 opacity-0 hover:opacity-80 transition duration-500 rounded-2xl pointer-events-none"></div>
 
-    <!-- Contenu -->
-    <div class="relative z-10">
-      <!-- En-tête -->
-      <div class="mb-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold text-gray-800 truncate w-4/5">{{ doc.title }}</h3>
+    <!-- Structure en grid avec colonnes fixes -->
+    <div class="grid grid-cols-[minmax(200px,1fr)_auto_auto_auto] gap-4 items-center relative z-10">
+      
+      <!-- Colonne 1 : Titre (flexible) -->
+      <div class="min-w-0">
+        <h3 class="text-lg font-bold text-gray-800 truncate" title="{{ doc.title }}">{{ doc.title }}</h3>
+        <div class="flex items-center gap-2 mt-1">
           <span class="text-xs text-gray-400">{{ doc.created_at.strftime('%d/%m/%Y') }}</span>
+          <!-- Badge nombre de mots -->
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            {{ doc.word_count }} mots
+          </span>
+          <!-- Badge taille -->
+          {% if doc.word_count < 800 %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              Petit
+            </span>
+          {% elif doc.word_count <= 1500 %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              Moyen
+            </span>
+          {% else %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              Grand
+            </span>
+          {% endif %}
         </div>
       </div>
 
-      <!-- Boutons d’action -->
-      <div class="flex justify-between items-center mt-4 pt-3 border-t border-gray-100 space-x-2">
+      <!-- Colonne 2 : Matière (fixe) -->
+      <div class="flex items-center gap-2 whitespace-nowrap">
+        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold"
+              style="background-color: {{ doc.subject.color }}1a; color: {{ doc.subject.color }}; border: 1.5px solid {{ doc.subject.color }};">
+          <span class="w-2 h-2 rounded-full mr-1.5" style="background-color: {{ doc.subject.color }};"></span>
+          {{ doc.subject.name }}
+        </span>
+        
+        <!-- Bouton pour changer la matière -->
+        <button class="change-subject-btn p-1.5 rounded-full hover:bg-gray-200 transition-colors" 
+                data-doc-id="{{ doc.id }}"
+                data-current-subject="{{ doc.subject.id }}"
+                title="Changer la matière">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Colonne 3 : Voir le cours (fixe) -->
+      <div>
+        <button data-view-course="{{ doc.id }}"
+                class="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200 whitespace-nowrap">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+          </svg>
+          Voir le cours
+        </button>
+      </div>
+
+      <!-- Colonne 4 : Actions quiz (fixe) -->
+      <div class="flex items-center gap-2 whitespace-nowrap">
         {% set quiz_exists = doc.questions|length > 0 %}
 
         {% if quiz_exists %}
           <!-- Jouer activé -->
           <a href="/quizzes/play/{{ doc.id }}" 
-            class="btn btn-green hover:brightness-105">
+            class="btn btn-green hover:brightness-105 play-btn">
             Jouer
           </a>
           <!-- Généré désactivé -->
           <button disabled 
-                  class="btn btn-yellow opacity-60 cursor-not-allowed" 
+                  class="btn btn-yellow opacity-60 cursor-not-allowed generate-btn" 
                   title="Quiz déjà généré">
             Généré
           </button>
         {% else %}
           <!-- Jouer désactivé -->
           <button disabled 
-                  class="btn btn-green opacity-60 cursor-not-allowed" 
-                  title="Génère d’abord le quiz pour pouvoir jouer">
+                  class="btn btn-green opacity-60 cursor-not-allowed play-btn" 
+                  title="Génère d'abord le quiz pour pouvoir jouer">
             Jouer
           </button>
           <!-- Générer actif -->
           <button data-generate="{{ doc.id }}" 
-                  class="btn btn-yellow hover:brightness-105">
+                  class="btn btn-yellow hover:brightness-105 generate-btn">
             Générer
           </button>
         {% endif %}
 
         <!-- Supprimer -->
         <button data-delete="{{ doc.id }}" 
-                class="btn btn-red hover:brightness-105">
+                class="btn btn-red hover:brightness-105 delete-btn" title="Supprimer">
           Supprimer
         </button>
       </div>
@@ -78,9 +330,19 @@
 </div>
 
 {% else %}
-<p class="text-center text-gray-500 text-lg mt-10">
-  Aucun document pour le moment.<br>
-</p>
+<!-- Message liste vide -->
+<div id="empty-message" class="text-center py-16">
+  <div class="text-6xl mb-4">📚</div>
+  <p class="text-gray-500 text-lg mb-6">
+    {{ empty_message.title if empty_message else 'Aucun cours pour le moment.' }}
+  </p>
+  <a href="{{ empty_message.action_url if empty_message else url_for('ui.upload') }}"
+     class="inline-block px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition-all font-medium">
+    {{ empty_message.action_text if empty_message else 'Ajouter votre premier cours' }}
+  </a>
+</div>
 {% endif %}
+
+</div>
 
 {% endblock %}

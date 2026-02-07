@@ -3,9 +3,40 @@ from flask import Blueprint, render_template, jsonify, request
 from sqlalchemy.orm import joinedload
 from flask_login import login_required, current_user
 from ..db import SessionLocal
-from ..models import Document, Question, QuizSession
+from ..models import Document, Question, QuizSession, Subject
+from sqlalchemy import func
+import os
 
 bp = Blueprint("ui", __name__)
+
+def get_empty_message(current_filter, subjects_with_stats):
+    """Génère le message approprié quand il n'y a aucun document"""
+    if not current_filter or current_filter == "all":
+        return {
+            'title': 'Aucun cours pour le moment.',
+            'action_text': 'Ajouter votre premier cours',
+            'action_url': '/upload'
+        }
+    
+    # Trouver le nom de la matière filtrée
+    subject_name = None
+    for subject in subjects_with_stats:
+        if subject['id'] == current_filter:
+            subject_name = subject['name']
+            break
+    
+    if subject_name:
+        return {
+            'title': f'Aucun cours dans {subject_name} pour le moment.',
+            'action_text': f'Ajouter un cours dans cette matière',
+            'action_url': f'/upload?subject={current_filter}'
+        }
+    else:
+        return {
+            'title': 'Aucun cours pour le moment.',
+            'action_text': 'Ajouter votre premier cours',
+            'action_url': '/upload'
+        }
 
 @bp.route("/")
 def home():
@@ -14,21 +45,102 @@ def home():
 @bp.route("/documents")
 @login_required
 def show_documents():
+    from ..extract import count_words, get_preview
+    
+    # Récupérer le filtre de matière depuis l'URL
+    subject_filter = request.args.get("subject")  # Peut être None, "all", ou un subject_id
+    
     with SessionLocal() as session:
-        docs = (
+        # Charger les matières avec leurs stats
+        subjects = session.query(Subject).filter_by(user_id=current_user.id).all()
+        subjects_with_stats = []
+        
+        for subject in subjects:
+            doc_count = session.query(Document).filter_by(
+                user_id=current_user.id,
+                subject_id=subject.id
+            ).count()
+            
+            subjects_with_stats.append({
+                'id': subject.id,
+                'name': subject.name,
+                'color': subject.color,
+                'doc_count': doc_count
+            })
+        
+        # Compter le total de documents
+        total_docs = session.query(Document).filter_by(user_id=current_user.id).count()
+        
+        # Construire la requête des documents
+        query = (
             session.query(Document)
-            .options(joinedload(Document.questions))  # ← charge les questions tout de suite
+            .options(joinedload(Document.questions), joinedload(Document.subject))
             .filter_by(user_id=current_user.id)
-            .order_by(Document.created_at.desc())
-            .all()
         )
+        
+        # Appliquer le filtre si nécessaire
+        if subject_filter and subject_filter != "all":
+            query = query.filter_by(subject_id=subject_filter)
+        
+        docs = query.order_by(Document.created_at.desc()).all()
+        
+        # Ajouter les métadonnées pour chaque document
+        docs_with_meta = []
+        for doc in docs:
+            doc_dict = {
+                'id': doc.id,
+                'title': doc.title,
+                'content': doc.content,
+                'created_at': doc.created_at,
+                'questions': list(doc.questions),
+                'word_count': count_words(doc.content),
+                'preview': get_preview(doc.content, max_chars=150),
+                'subject': {
+                    'id': doc.subject.id,
+                    'name': doc.subject.name,
+                    'color': doc.subject.color
+                } if doc.subject else None
+            }
+            docs_with_meta.append(doc_dict)
+        
+        # Générer le message pour liste vide
+        empty_message = None if docs_with_meta else get_empty_message(subject_filter, subjects_with_stats)
+        
+        # Trouver la matière sélectionnée
+        selected_subject = None
+        if subject_filter and subject_filter != "all":
+            for subject in subjects_with_stats:
+                if subject['id'] == subject_filter:
+                    selected_subject = subject
+                    break
 
-    return render_template("documents.html", documents=docs)
+    return render_template(
+        "documents.html", 
+        documents=docs_with_meta, 
+        subjects=subjects_with_stats,
+        current_filter=subject_filter or "all",
+        total_docs=total_docs,
+        empty_message=empty_message,
+        selected_subject=selected_subject,
+        mock_mode=os.getenv("MOCK_GEMINI") == "True"
+    )
 
 @bp.route("/upload")
 @login_required
 def upload():
-    return render_template("upload.html")
+    # Récupérer l'ID de la matière si passée en paramètre
+    preselected_subject = request.args.get("subject", "")
+    
+    with SessionLocal() as session:
+        # Charger les matières de l'utilisateur
+        subjects = session.query(Subject).filter_by(user_id=current_user.id).all()
+        subjects_list = [{'id': s.id, 'name': s.name, 'color': s.color} for s in subjects]
+    
+    return render_template(
+        "upload.html", 
+        subjects=subjects_list,
+        preselected_subject=preselected_subject
+    )
 
 @bp.route("/quizzes/<string:document_id>")
 @login_required

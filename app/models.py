@@ -25,12 +25,27 @@ class User(Base, UserMixin):
 
     documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
     quiz_sessions = relationship("QuizSession", back_populates="user", cascade="all, delete-orphan")
+    subjects = relationship("Subject", back_populates="user", cascade="all, delete-orphan")
 
     def set_password(self, password: str):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+
+# --- Table subjects (matières) ---
+class Subject(Base):
+    __tablename__ = "subjects"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(Text, nullable=False)
+    color = Column(Text, nullable=False, default="#3B82F6")  # Couleur par défaut (bleu)
+    user_id = Column(Text, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User", back_populates="subjects")
+    documents = relationship("Document", back_populates="subject")
 
 
 # --- Table documents ---
@@ -44,6 +59,9 @@ class Document(Base):
 
     user_id = Column(Text, ForeignKey("users.id"), nullable=True)
     user = relationship("User", back_populates="documents")
+
+    subject_id = Column(Text, ForeignKey("subjects.id"), nullable=True)
+    subject = relationship("Subject", back_populates="documents")
 
     questions = relationship("Question", back_populates="document", cascade="all, delete-orphan")
 
