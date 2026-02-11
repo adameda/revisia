@@ -1,5 +1,5 @@
 # app/routes/auth.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import (
     LoginManager,
     login_user,
@@ -95,3 +95,67 @@ def logout():
     logout_user()
     flash("👋 Déconnecté avec succès.")
     return redirect(url_for("auth.login"))
+
+
+# --- Promotion en professeur avec code admin ---
+@bp.route("/promote-to-teacher", methods=["POST"])
+@login_required
+def promote_to_teacher():
+    """Promouvoir un utilisateur en professeur avec un code admin"""
+    admin_code = request.form.get("admin_code", "").strip()
+    
+    # Code admin défini dans les variables d'environnement
+    correct_code = current_app.config.get("ADMIN_CODE", "PROF2026")
+    
+    if not admin_code:
+        flash("Veuillez entrer un code admin.", "error")
+        return redirect(url_for("ui.home"))
+    
+    if admin_code != correct_code:
+        flash("❌ Code admin incorrect.", "error")
+        return redirect(url_for("ui.home"))
+    
+    # Promouvoir l'utilisateur
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter_by(id=current_user.id).first()
+        if user:
+            if user.is_teacher:
+                flash("Vous êtes déjà professeur.", "error")
+            else:
+                user.is_teacher = True
+                session.commit()
+                flash(f"🎓 Félicitations {user.username} ! Vous êtes maintenant professeur.", "success")
+        session.close()
+    except Exception as e:
+        session.rollback()
+        session.close()
+        flash(f"Erreur: {str(e)}", "error")
+    
+    return redirect(url_for("ui.home"))
+
+
+# --- Toggle prof/élève (mode debug uniquement) ---
+@bp.route("/toggle-teacher", methods=["POST"])
+@login_required
+def toggle_teacher():
+    """Basculer entre prof et élève (pour les tests en mode DEBUG)"""
+    if not current_app.config.get("DEBUG", False):
+        flash("Cette fonctionnalité n'est disponible qu'en mode debug.", "error")
+        return redirect(url_for("ui.home"))
+    
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter_by(id=current_user.id).first()
+        if user:
+            user.is_teacher = not user.is_teacher
+            session.commit()
+            status = "professeur" if user.is_teacher else "élève"
+            flash(f"🔄 Mode basculé : vous êtes maintenant {status}", "success")
+        session.close()
+    except Exception as e:
+        session.rollback()
+        session.close()
+        flash(f"Erreur: {str(e)}", "error")
+    
+    return redirect(url_for("ui.home"))

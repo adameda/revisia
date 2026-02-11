@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Créer un événement - {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- En-tête -->
+    <div class="mb-8">
+        <a href="{{ url_for('teacher_events.group_events', group_id=group.id) }}" class="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+            ← Retour aux événements
+        </a>
+        <h1 class="text-3xl font-bold text-gray-900">Créer un événement</h1>
+        <p class="text-gray-600">Groupe : {{ group.name }}</p>
+    </div>
+
+    <!-- Formulaire -->
+    <div class="bg-white rounded-xl shadow-md p-8">
+        <form method="POST" action="{{ url_for('teacher_events.create_event', group_id=group.id) }}">
+            <!-- Nom -->
+            <div class="mb-6">
+                <label for="name" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Nom de l'événement *
+                </label>
+                <input type="text" 
+                       id="name" 
+                       name="name" 
+                       required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       placeholder="Compétition de fin de mois">
+            </div>
+
+            <!-- Description -->
+            <div class="mb-6">
+                <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Description (optionnelle)
+                </label>
+                <textarea id="description" 
+                          name="description" 
+                          rows="3"
+                          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Décrivez l'événement..."></textarea>
+            </div>
+
+            <!-- Matière -->
+            <div class="mb-6">
+                <label for="subject_id" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Matière *
+                </label>
+                {% if subjects %}
+                    <select id="subject_id" 
+                            name="subject_id" 
+                            required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Sélectionnez une matière</option>
+                        {% for subject in subjects %}
+                        <option value="{{ subject.id }}">{{ subject.name }}</option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800">
+                        <p class="font-semibold flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                            <span>Aucune matière liée à ce groupe</span>
+                        </p>
+                        <p class="text-sm mt-1">Vous devez d'abord lier des matières au groupe avant de créer un événement.</p>
+                        <a href="{{ url_for('teacher.view_group', group_id=group.id) }}" 
+                           class="text-blue-600 hover:text-blue-800 font-semibold text-sm mt-2 inline-block">
+                            → Gérer les matières du groupe
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Dates -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="start_date" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Date de début *
+                    </label>
+                    <input type="datetime-local" 
+                           id="start_date" 
+                           name="start_date" 
+                           required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+
+                <div>
+                    <label for="end_date" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Date de fin *
+                    </label>
+                    <input type="datetime-local" 
+                           id="end_date" 
+                           name="end_date" 
+                           required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+            </div>
+
+            <!-- Informations -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p class="text-sm text-blue-900 font-semibold mb-2">ℹ️ Informations importantes</p>
+                <ul class="text-sm text-blue-800 space-y-1 ml-4 list-disc">
+                    <li>L'événement générera automatiquement <strong>5 quiz de 20 questions</strong> chacun</li>
+                    <li>Les questions seront tirées aléatoirement de la matière sélectionnée</li>
+                    <li>Il faut au minimum <strong>100 questions</strong> dans la matière</li>
+                    <li>Les étudiants devront compléter les quiz de manière séquentielle</li>
+                    <li>Chaque quiz ne peut être tenté qu'une seule fois</li>
+                </ul>
+            </div>
+
+            <!-- Boutons -->
+            <div class="flex gap-4">
+                {% if subjects %}
+                <button type="submit" 
+                        class="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>Créer l'événement</span>
+                </button>
+                {% endif %}
+                <a href="{{ url_for('teacher_events.group_events', group_id=group.id) }}" 
+                   class="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors text-center">
+                    Annuler
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Définir la date de début par défaut à maintenant
+document.addEventListener('DOMContentLoaded', function() {
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+    
+    // Date actuelle
+    const now = new Date();
+    const formattedNow = now.toISOString().slice(0, 16);
+    startDateInput.value = formattedNow;
+    
+    // Date de fin par défaut : 1 semaine plus tard
+    const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const formattedEnd = oneWeekLater.toISOString().slice(0, 16);
+    endDateInput.value = formattedEnd;
+    
+    // Validation : la date de fin doit être après la date de début
+    endDateInput.addEventListener('change', function() {
+        if (endDateInput.value <= startDateInput.value) {
+            alert('La date de fin doit être après la date de début');
+            endDateInput.value = '';
+        }
+    });
+});
+</script>
+{% endblock %}

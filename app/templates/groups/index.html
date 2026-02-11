@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Mes Groupes{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+      Mes Groupes
+    </h1>
+    <p class="text-gray-600">Groupes auxquels vous appartenez</p>
+  </div>
+
+  <!-- Bouton rejoindre un groupe -->
+  <div class="mb-6">
+    <button onclick="openJoinGroupModal()" 
+            class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-xl shadow-lg hover:opacity-90 transition transform hover:-translate-y-0.5">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+      <span class="font-semibold">Rejoindre un groupe</span>
+    </button>
+  </div>
+
+  <!-- Modal rejoindre un groupe -->
+  <div id="joinGroupModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-modal">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-2xl font-bold text-gray-800">Rejoindre un groupe</h3>
+      </div>
+      
+      <form method="POST" action="{{ url_for('groups.join_group') }}" class="p-6">
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Code d'invitation</label>
+          <input type="text" name="invite_code" required 
+                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-mono uppercase"
+                 placeholder="Ex: REV-ABC123"
+                 pattern="REV-[A-Z0-9]{6}"
+                 maxlength="10">
+          <p class="text-sm text-gray-500 mt-2">Demandez le code à votre professeur</p>
+        </div>
+        
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeJoinGroupModal()"
+                  class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+            Annuler
+          </button>
+          <button type="submit"
+                  class="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition">
+            Rejoindre
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Liste des groupes -->
+  {% if groups %}
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {% for group in groups %}
+        <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition p-6 border-l-4 border-blue-500 min-h-[280px] flex flex-col">
+          <!-- Nom du groupe -->
+          <div class="mb-3">
+            <h3 class="text-xl font-bold text-gray-800 mb-1">
+              {{ group.name }}
+            </h3>
+            <div class="min-h-[20px]">
+              {% if group.description %}
+                <p class="text-sm text-gray-600">{{ group.description }}</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div class="flex items-center gap-2 text-sm text-gray-600 mb-4">
+            <svg class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span class="font-semibold">{{ group.members_count }}</span>
+            <span>membre{{ 's' if group.members_count > 1 else '' }}</span>
+          </div>
+
+          <!-- Info professeur -->
+          <div class="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+            <p class="text-xs text-gray-600 mb-1 font-medium">Professeur</p>
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span class="text-lg font-semibold text-gray-800">{{ group.teacher.username }}</span>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-2 mt-auto">
+            <a href="{{ url_for('groups.view_group', group_id=group.id) }}"
+               class="flex-1 text-center bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition text-sm font-semibold">
+              Voir le groupe
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <!-- Message vide -->
+    <div class="text-center py-16">
+      <div class="mb-6">
+        <svg class="w-24 h-24 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      </div>
+      <h3 class="text-2xl font-bold text-gray-800 mb-3">Aucun groupe pour le moment</h3>
+      <p class="text-gray-600 mb-6">Demandez un code d'invitation à votre professeur pour rejoindre un groupe</p>
+      <button onclick="openJoinGroupModal()"
+              class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-xl shadow-lg hover:opacity-90 transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        <span class="font-semibold">Rejoindre un groupe</span>
+      </button>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Script -->
+<script>
+  function openJoinGroupModal() {
+    document.getElementById('joinGroupModal').classList.remove('hidden');
+    document.getElementById('joinGroupModal').classList.add('flex');
+  }
+
+  function closeJoinGroupModal() {
+    document.getElementById('joinGroupModal').classList.add('hidden');
+    document.getElementById('joinGroupModal').classList.remove('flex');
+  }
+
+  // Fermer la modal avec Echap
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeJoinGroupModal();
+    }
+  });
+
+  // Fermer la modal en cliquant en dehors
+  document.getElementById('joinGroupModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'joinGroupModal') {
+      closeJoinGroupModal();
+    }
+  });
+</script>
+
+<style>
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-modal {
+    animation: modalSlideIn 0.2s ease-out;
+  }
+</style>
+{% endblock %}

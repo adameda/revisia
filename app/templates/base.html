@@ -284,10 +284,40 @@
           Résultats
         </a>
 
+        {% if current_user.is_authenticated %}
+          {% if current_user.is_teacher %}
+            <a href="{{ url_for('teacher.list_groups') }}"
+              class="px-5 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
+              Mes Groupes
+            </a>
+          {% else %}
+            <a href="{{ url_for('groups.list_groups') }}"
+              class="px-5 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
+              Mes Groupes
+            </a>
+          {% endif %}
+        {% endif %}
+
 
 
         {% if current_user.is_authenticated %}
           <span class="text-gray-600">👋 {{ current_user.username }}</span>
+
+          {% if debug_mode %}
+            <form method="POST" action="{{ url_for('auth.toggle_teacher') }}" class="inline">
+              <button type="submit" 
+                      class="px-3 py-2 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition font-semibold"
+                      title="Basculer prof/élève (mode debug)">
+                🔄 {{ 'Élève' if current_user.is_teacher else 'Prof' }}
+              </button>
+            </form>
+          {% elif not current_user.is_teacher %}
+            <button onclick="openTeacherModal()" 
+                    class="px-3 py-2 text-sm bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition font-semibold"
+                    title="Devenir professeur">
+              🎓 Prof
+            </button>
+          {% endif %}
 
           <a href="{{ url_for('auth.logout') }}"
             class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
@@ -310,12 +340,19 @@
 
   <!-- Main -->
   <main class="container mx-auto flex-1 mt-24 p-6">
+    {% if debug_mode and current_user.is_authenticated %}
+      <div class="fixed bottom-4 right-4 z-40 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-semibold">
+        🔧 Mode Debug : {{ '👨‍🏫 Prof' if current_user.is_teacher else '🎓 Élève' }}
+      </div>
+    {% endif %}
+    
     {% with messages = get_flashed_messages(with_categories=True) %}
       {% if messages %}
         <div class="max-w-md mx-auto mb-6">
           {% for category, message in messages %}
             <div class="p-3 rounded mb-2 text-sm
                         {% if category == 'error' %}bg-red-100 text-red-700
+                        {% elif category == 'warning' %}bg-yellow-100 text-yellow-700
                         {% else %}bg-green-100 text-green-700{% endif %}">
               {{ message }}
             </div>
@@ -325,6 +362,47 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Modal code admin pour devenir professeur -->
+  {% if current_user.is_authenticated and not current_user.is_teacher %}
+  <div id="teacherModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-modal">
+      <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🎓</span>
+          <h3 class="text-2xl font-bold text-gray-800">Devenir professeur</h3>
+        </div>
+      </div>
+      
+      <form method="POST" action="{{ url_for('auth.promote_to_teacher') }}" class="p-6">
+        <p class="text-gray-600 mb-4">
+          Entrez le code admin pour accéder aux fonctionnalités professeur.
+        </p>
+        
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Code admin</label>
+          <input type="password" name="admin_code" required 
+                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                 placeholder="Entrez le code...">
+          <p class="text-xs text-gray-500 mt-2">
+            💡 Code par défaut : <code class="bg-gray-100 px-2 py-1 rounded">PROF2026</code>
+          </p>
+        </div>
+        
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeTeacherModal()"
+                  class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+            Annuler
+          </button>
+          <button type="submit"
+                  class="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition">
+            Valider
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Système de modal unifié -->
   <div id="unified-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 unified-modal">
@@ -365,8 +443,53 @@
     display: inline-block;
     animation: footerScroll 25s linear infinite;
   }
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-modal {
+    animation: modalSlideIn 0.2s ease-out;
+  }
   </style>
 
+  <script>
+    // Fonctions pour la modal professeur
+    function openTeacherModal() {
+      const modal = document.getElementById('teacherModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function closeTeacherModal() {
+      const modal = document.getElementById('teacherModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    // Fermer avec Echap
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeTeacherModal();
+      }
+    });
+
+    // Fermer en cliquant en dehors
+    document.getElementById('teacherModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'teacherModal') {
+        closeTeacherModal();
+      }
+    });
+  </script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>

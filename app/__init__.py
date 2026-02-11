@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 from .db import init_db
 from . import models
-from .routes import documents, ui, quizzes, results, auth, subjects
+from .routes import documents, ui, quizzes, results, auth, subjects, groups, events
 from .routes.auth import login_manager
 
 load_dotenv()
@@ -16,7 +16,8 @@ def create_app():
         SECRET_KEY="dev",
         DATABASE_URL="sqlite:///data.db",
         DEBUG=os.getenv("DEBUG", "False").lower() == "true",
-        MOCK_GEMINI=os.getenv("MOCK_GEMINI", "False").lower() == "true"
+        MOCK_GEMINI=os.getenv("MOCK_GEMINI", "False").lower() == "true",
+        ADMIN_CODE=os.getenv("ADMIN_CODE", "PROF2026")
     )
 
     # --- Base de données ---
@@ -32,6 +33,10 @@ def create_app():
     app.register_blueprint(quizzes.bp)
     app.register_blueprint(results.bp)
     app.register_blueprint(subjects.bp)
+    app.register_blueprint(groups.teacher_bp)
+    app.register_blueprint(groups.groups_bp)
+    app.register_blueprint(events.teacher_events_bp)
+    app.register_blueprint(events.student_events_bp)
     app.register_blueprint(ui.bp)
 
     # --- Variables globales ---

@@ -183,7 +183,49 @@ def delete_subject(subject_id):
                 "document_count": doc_count
             }), 400
         
-        # Supprimer la matière (elle est vide)
+        # ⚠️ NOUVEAU : Vérifier si la matière est utilisée dans des événements
+        from ..models import Event, GroupSubject
+        from datetime import datetime
+        
+        # Événements actifs (en cours)
+        now = datetime.now()
+        active_events = session.query(Event).filter(
+            Event.subject_id == subject_id,
+            Event.start_date <= now,
+            Event.end_date >= now
+        ).count()
+        
+        if active_events > 0:
+            session.close()
+            return jsonify({
+                "error": f"❌ Impossible : {active_events} événement(s) en cours utilise(nt) cette matière.",
+                "active_events": active_events
+            }), 400
+        
+        # Événements futurs (à venir)
+        future_events = session.query(Event).filter(
+            Event.subject_id == subject_id,
+            Event.start_date > now
+        ).count()
+        
+        if future_events > 0:
+            session.close()
+            return jsonify({
+                "error": f"⚠️ Impossible : {future_events} événement(s) à venir utilise(nt) cette matière. Supprimez d'abord les événements.",
+                "future_events": future_events
+            }), 400
+        
+        # Vérifier si la matière est liée à des groupes
+        group_links = session.query(GroupSubject).filter_by(subject_id=subject_id).count()
+        
+        if group_links > 0:
+            session.close()
+            return jsonify({
+                "error": f"⚠️ Cette matière est liée à {group_links} groupe(s). Retirez-la des groupes d'abord.",
+                "group_links": group_links
+            }), 400
+        
+        # Supprimer la matière (elle est vide et non utilisée)
         session.delete(subject)
         session.commit()
         session.close()

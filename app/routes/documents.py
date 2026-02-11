@@ -88,6 +88,72 @@ def delete_document(document_id):
             session.close()
             return jsonify({"error": "Non autorisé"}), 403
 
+        # ⚠️ NOUVEAU : Vérifier si les questions du document sont utilisées dans des événements actifs
+        from ..models import Question, EventQuiz, Event
+        from datetime import datetime
+        import json
+        
+        # Récupérer toutes les questions du document
+        questions = session.query(Question).filter_by(document_id=document_id).all()
+        question_ids = [q.id for q in questions]
+        
+        if question_ids:
+            # Vérifier si ces questions sont dans des événements actifs
+            now = datetime.now()
+            active_events_with_questions = []
+            
+            # Récupérer tous les quiz d'événements actifs
+            active_event_quizzes = session.query(EventQuiz, Event).join(
+                Event, EventQuiz.event_id == Event.id
+            ).filter(
+                Event.start_date <= now,
+                Event.end_date >= now
+            ).all()
+            
+            # Vérifier si une de nos questions est dans ces quiz
+            for quiz, event in active_event_quizzes:
+                quiz_questions = json.loads(quiz.questions)
+                # Vérifier intersection entre nos questions et celles du quiz
+                if any(qid in quiz_questions for qid in question_ids):
+                    if event.name not in [e['name'] for e in active_events_with_questions]:
+                        active_events_with_questions.append({
+                            'name': event.name,
+                            'id': event.id
+                        })
+            
+            if active_events_with_questions:
+                event_names = ', '.join([e['name'] for e in active_events_with_questions])
+                session.close()
+                return jsonify({
+                    "error": f"❌ Impossible : ce cours contient des questions utilisées dans {len(active_events_with_questions)} événement(s) en cours : {event_names}",
+                    "active_events": active_events_with_questions
+                }), 400
+            
+            # Vérifier événements futurs
+            future_event_quizzes = session.query(EventQuiz, Event).join(
+                Event, EventQuiz.event_id == Event.id
+            ).filter(
+                Event.start_date > now
+            ).all()
+            
+            future_events_with_questions = []
+            for quiz, event in future_event_quizzes:
+                quiz_questions = json.loads(quiz.questions)
+                if any(qid in quiz_questions for qid in question_ids):
+                    if event.name not in [e['name'] for e in future_events_with_questions]:
+                        future_events_with_questions.append({
+                            'name': event.name,
+                            'id': event.id
+                        })
+            
+            if future_events_with_questions:
+                event_names = ', '.join([e['name'] for e in future_events_with_questions])
+                session.close()
+                return jsonify({
+                    "error": f"⚠️ Impossible : ce cours contient des questions utilisées dans {len(future_events_with_questions)} événement(s) à venir : {event_names}. Supprimez d'abord les événements.",
+                    "future_events": future_events_with_questions
+                }), 400
+
         session.delete(document)
         session.commit()
         session.close()
