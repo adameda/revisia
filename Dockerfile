@@ -44,4 +44,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE $PORT
 
 # Commande de démarrage (exec pour gestion propre des signaux)
-CMD exec gunicorn run:app --bind 0.0.0.0:$PORT --workers 2
+CMD exec gunicorn run:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120

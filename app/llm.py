@@ -135,7 +135,8 @@ def generate_quiz_from_text(text: str, total_questions: int) -> Tuple[List[dict]
                 config=types.GenerateContentConfig(
                     temperature=0.3,
                     response_mime_type="application/json",
-                    response_json_schema=QuizResponse.model_json_schema()
+                    response_json_schema=QuizResponse.model_json_schema(),
+                    http_options=types.HttpOptions(timeout=90000)  # 90s en millisecondes
                 )
             )
 
