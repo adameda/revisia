@@ -20,7 +20,7 @@ L’application permet à un utilisateur de :
   <li>Extraire automatiquement le texte pour le transformer en quiz à choix multiples grâce à un <strong>LLM (Google Gemini)</strong>.</li>
   <li>Répondre question par question avec un feedback immédiat.</li>
   <li>Sauvegarder ses résultats pour suivre sa progression.</li>
-  <li>Affronter ses amis sur ses cours grâce au nouveau système de <strong>GROUP/EVENTS<strong>.</li>
+  <li>Affronter ses amis sur ses cours grâce au nouveau système de <strong>GROUP/EVENTS</strong>.</li>
 </ul>
 
 <hr>
