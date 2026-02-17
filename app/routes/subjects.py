@@ -30,7 +30,7 @@ COLORS = [
 ]
 
 
-@bp.route("/", methods=["GET"])
+@bp.route("", methods=["GET"])
 @login_required
 def get_subjects():
     """
@@ -64,7 +64,7 @@ def get_subjects():
         session.close()
 
 
-@bp.route("/", methods=["POST"])
+@bp.route("", methods=["POST"])
 @login_required
 def create_subject():
     """
