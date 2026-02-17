@@ -119,11 +119,9 @@ def generate_quiz_from_text(text: str, total_questions: int) -> Tuple[List[dict]
     Retourne (questions, error) : questions est une liste, error est None ou un code d'erreur.
     Codes d'erreur : "quota_exceeded", "error"
     """
-    # Mode mock activé
     if MOCK_MODE:
-        return generate_mock_quiz(text, total_questions = 100), None
+        return generate_mock_quiz(text, total_questions=100), None
 
-    # Mode production - Appel réel à Gemini avec fallback multi-clés
     logger.info(f"Appel API Gemini : {total_questions} questions demandées")
     prompt = PROMPT_TEMPLATE.format(texte=text, nb_questions=total_questions)
 
@@ -138,7 +136,8 @@ def generate_quiz_from_text(text: str, total_questions: int) -> Tuple[List[dict]
                     temperature=0.3,
                     response_mime_type="application/json",
                     response_json_schema=QuizResponse.model_json_schema()
-                )
+                ),
+                timeout=30  # <-- Timeout explicite pour éviter blocage
             )
 
             quiz = QuizResponse.model_validate_json(response.text)
@@ -147,6 +146,7 @@ def generate_quiz_from_text(text: str, total_questions: int) -> Tuple[List[dict]
             return [item.model_dump() for item in quiz.items], None
 
         except Exception as e:
+            # Détecte les erreurs de quota
             error_str = str(e).lower()
             is_quota = "resource" in error_str and "exhausted" in error_str or "429" in error_str
             last_error = e
@@ -159,8 +159,8 @@ def generate_quiz_from_text(text: str, total_questions: int) -> Tuple[List[dict]
                 logger.error(f"Quota dépassé sur toutes les clés")
                 return [], "quota_exceeded"
             else:
-                logger.error(f"Erreur API ({key_label}) : {e}")
+                logger.error(f"Erreur API ou réseau ({key_label}) : {e}")
                 return [], "error"
 
-    logger.error(f"Aucune clé API disponible")
+    logger.error(f"Aucune clé API disponible ou toutes les requêtes ont échoué : {last_error}")
     return [], "error"
