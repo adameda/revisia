@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Bouton retour -->
+  <div class="mb-6">
+    <a href="{{ url_for('groups.list_groups') }}"
+       class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition font-semibold">
+      <span>←</span> <span>Retour aux groupes</span>
+    </a>
+  </div>
+
+  <!-- Header du groupe -->
+  <div class="bg-white rounded-2xl shadow-lg p-5 sm:p-8 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+      <div>
+        {% if is_owner %}
+        <span class="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full mb-2 inline-block">Propriétaire</span>
+        {% endif %}
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">{{ group.name }}</h1>
+        {% if group.description %}
+          <p class="text-gray-600">{{ group.description }}</p>
+        {% endif %}
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="{{ url_for('events.group_events', group_id=group.id) }}"
+           class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-semibold flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span>Événements</span>
+        </a>
+        {% if is_owner %}
+          <button onclick="confirmDeleteGroup()"
+                  class="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition font-semibold flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Supprimer</span>
+          </button>
+        {% else %}
+          <button onclick="confirmLeaveGroup()"
+                  class="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition font-semibold flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>Quitter</span>
+          </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Infos -->
+    <div class="grid grid-cols-2 gap-4 mt-6">
+      {% if is_owner %}
+      <!-- Code d'invitation (propriétaire) -->
+      <div class="col-span-2 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
+        <p class="text-sm text-gray-600 mb-2 font-semibold flex items-center gap-2">
+          <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+          <span>Code d'invitation</span>
+        </p>
+        <div class="flex items-center justify-between">
+          <code class="text-2xl font-mono font-bold text-blue-600">{{ group.invite_code }}</code>
+          <button onclick="copyCode('{{ group.invite_code }}')"
+                  class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-semibold flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Copier</span>
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Partagez ce code pour inviter des membres</p>
+      </div>
+      {% else %}
+      <div class="p-4 bg-blue-50 rounded-lg">
+        <p class="text-sm text-gray-600 mb-1">Créé par</p>
+        <p class="font-bold text-gray-800">{{ owner.username }}</p>
+      </div>
+      {% endif %}
+      <div class="p-4 bg-indigo-50 rounded-lg">
+        <p class="text-sm text-gray-600 mb-1">Membres</p>
+        <p class="font-bold text-gray-800">{{ member_count }} membre{{ 's' if member_count > 1 else '' }}</p>
+      </div>
+      {% if not is_owner %}
+      <div class="p-4 bg-purple-50 rounded-lg">
+        <p class="text-sm text-gray-600 mb-1">Matières</p>
+        <p class="font-bold text-gray-800">{{ subjects|length }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Onglets -->
+  <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+    <div class="flex border-b border-gray-200">
+      {% if is_owner %}
+      <button onclick="switchTab('members')" id="tab-members"
+              class="flex-1 px-6 py-4 text-center font-semibold transition border-b-2 border-blue-500 text-blue-600 flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <span>Membres ({{ members|length }})</span>
+      </button>
+      {% endif %}
+      <button onclick="switchTab('subjects')" id="tab-subjects"
+              class="flex-1 px-6 py-4 text-center font-semibold transition border-b-2 {{ 'border-transparent text-gray-600' if is_owner else 'border-blue-500 text-blue-600' }} flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+        <span>Matières ({{ subjects|length }})</span>
+      </button>
+    </div>
+
+    <!-- Onglet Membres (propriétaire uniquement) -->
+    {% if is_owner %}
+    <div id="content-members" class="p-8">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">Membres du groupe</h2>
+      {% if members %}
+        <div class="space-y-3">
+          {% for item in members %}
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold">
+                  {{ item.user.username[0].upper() }}
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800">{{ item.user.username }}</p>
+                  <p class="text-xs text-gray-500">Rejoint le {{ item.member.joined_at.strftime('%d/%m/%Y') }}</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 {{ 'bg-indigo-100 text-indigo-700' if item.is_owner else 'bg-green-100 text-green-700' }} rounded-full font-semibold text-sm">
+                {{ 'Propriétaire' if item.is_owner else 'Membre' }}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-center py-12">
+          <p class="text-gray-600">Aucun membre n'a encore rejoint ce groupe</p>
+          <p class="text-sm text-gray-500 mt-2">Partagez le code d'invitation</p>
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Onglet Matières -->
+    <div id="content-subjects" class="p-8 {{ 'hidden' if is_owner else '' }}">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">{{ 'Matières du groupe' if is_owner else 'Matières disponibles' }}</h2>
+        {% if is_owner and available_subjects %}
+          <button onclick="openAddSubjectModal()"
+                  class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition font-semibold">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Ajouter</span>
+          </button>
+        {% endif %}
+      </div>
+
+      {% if subjects %}
+        <div class="{% if is_owner %}space-y-3{% else %}grid gap-4 md:grid-cols-2{% endif %}">
+          {% for item in subjects %}
+            {% if is_owner %}
+            <!-- Vue propriétaire : liste avec bouton retirer -->
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold" style="background-color: {{ item.subject.color }};">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800">{{ item.subject.name }}</p>
+                  <p class="text-xs text-gray-500">{{ item.document_count }} cours</p>
+                </div>
+              </div>
+              <button onclick="confirmRemoveSubject('{{ item.subject.id }}', '{{ item.subject.name }}')"
+                      class="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition font-semibold text-sm">
+                Retirer
+              </button>
+            </div>
+            {% else %}
+            <!-- Vue membre : carte avec lien vers les cours -->
+            <div class="bg-gray-50 rounded-xl p-6 hover:shadow-md transition border border-gray-200">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-lg flex items-center justify-center text-white" style="background-color: {{ item.subject.color }};">
+                  <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-bold text-gray-800 text-lg">{{ item.subject.name }}</h3>
+                  <p class="text-sm text-gray-600">{{ item.document_count }} cours</p>
+                </div>
+              </div>
+              <a href="{{ url_for('groups.view_subject_documents', group_id=group.id, subject_id=item.subject.id) }}"
+                 class="block w-full text-center bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-lg hover:opacity-90 transition font-semibold">
+                Voir les cours →
+              </a>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-center py-12">
+          <p class="text-gray-600">Aucune matière liée à ce groupe</p>
+          {% if is_owner and available_subjects %}
+            <button onclick="openAddSubjectModal()"
+                    class="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl shadow-lg hover:opacity-90 transition">
+              <span>Ajouter ma première matière</span>
+            </button>
+          {% elif is_owner %}
+            <p class="text-sm text-gray-500 mt-2">Créez d'abord des matières dans la section "Cours"</p>
+          {% else %}
+            <p class="text-sm text-gray-500 mt-2">Le propriétaire n'a pas encore ajouté de matières</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Modal ajouter une matière (propriétaire) -->
+  {% if is_owner and available_subjects %}
+  <div id="addSubjectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-modal">
+      <div class="p-6 border-b border-gray-200">
+        <h3 class="text-2xl font-bold text-gray-800">Ajouter une matière</h3>
+      </div>
+      <form method="POST" action="{{ url_for('groups.add_subject_to_group', group_id=group.id) }}" class="p-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Sélectionnez une matière</label>
+          <select name="subject_id" required
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <option value="">-- Choisir --</option>
+            {% for subject in available_subjects %}
+              <option value="{{ subject.id }}">{{ subject.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button type="button" onclick="closeAddSubjectModal()"
+                  class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Annuler</button>
+          <button type="submit"
+                  class="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition">Ajouter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  function switchTab(tabName) {
+    document.querySelectorAll('[id^="content-"]').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('[id^="tab-"]').forEach(el => {
+      el.classList.remove('border-blue-500', 'text-blue-600');
+      el.classList.add('border-transparent', 'text-gray-600');
+    });
+    document.getElementById(`content-${tabName}`).classList.remove('hidden');
+    const tab = document.getElementById(`tab-${tabName}`);
+    tab.classList.remove('border-transparent', 'text-gray-600');
+    tab.classList.add('border-blue-500', 'text-blue-600');
+  }
+
+  // Helper : crée un formulaire POST avec le token CSRF et le soumet
+  function submitPostForm(action) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrf_token';
+    csrf.value = document.querySelector('meta[name="csrf-token"]').content;
+    form.appendChild(csrf);
+    document.body.appendChild(form);
+    form.submit();
+  }
+
+  function copyCode(code) {
+    navigator.clipboard.writeText(code).then(() => {
+      const toast = document.createElement('div');
+      toast.className = 'fixed top-24 right-6 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-green-500';
+      toast.textContent = 'Code copié !';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    });
+  }
+
+  function confirmDeleteGroup() {
+    if (confirm('⚠️ Supprimer ce groupe ?\n\nTous les membres seront retirés. Cette action est irréversible.')) {
+      submitPostForm('{{ url_for("groups.delete_group", group_id=group.id) }}');
+    }
+  }
+
+  function confirmLeaveGroup() {
+    if (confirm('⚠️ Quitter ce groupe ?\n\nVous perdrez l\'accès aux matières et aux événements.')) {
+      submitPostForm('{{ url_for("groups.leave_group", group_id=group.id) }}');
+    }
+  }
+
+  function openAddSubjectModal() {
+    const m = document.getElementById('addSubjectModal');
+    if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+  }
+  function closeAddSubjectModal() {
+    const m = document.getElementById('addSubjectModal');
+    if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+  }
+
+  function confirmRemoveSubject(subjectId, subjectName) {
+    if (confirm(`Retirer "${subjectName}" de ce groupe ?`)) {
+      submitPostForm(`/groups/{{ group.id }}/subjects/${subjectId}/remove`);
+    }
+  }
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAddSubjectModal(); });
+  document.getElementById('addSubjectModal')?.addEventListener('click', (e) => { if (e.target.id === 'addSubjectModal') closeAddSubjectModal(); });
+</script>
+
+<style>
+  @keyframes modalSlideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-modal { animation: modalSlideIn 0.2s ease-out; }
+</style>
+{% endblock %}

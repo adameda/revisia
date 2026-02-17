@@ -5,9 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Révis'IA{% endblock %} | Révis'IA</title>
   <!-- Icône de l’onglet -->
-  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=3">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}">
+  <link rel="icon" type="image/png" sizes="256x256" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/favicon.png') }}">
   <meta name="theme-color" content="#2563eb">
+
+  <!-- Token CSRF : lu par le JS pour sécuriser les requêtes AJAX -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -258,8 +262,8 @@
 <body class="bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-gray-800 flex flex-col min-h-screen">
 
   <!-- Header -->
-  <header class="bg-white/90 backdrop-blur-md shadow-sm fixed w-full top-0 z-10 border-b border-gray-100">
-    <nav class="container mx-auto flex justify-between items-center px-6 py-3">
+  <header class="bg-white shadow-sm fixed w-full top-0 z-50 border-b border-gray-200">
+    <nav class="container mx-auto flex justify-between items-center px-4 sm:px-6 py-3">
       <a href="/" class="flex items-center gap-3 hover:opacity-90 transition">
         <!-- Conteneur du logo -->
         <div class="relative flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 via-blue-500 to-indigo-500 shadow-md logo-glow">
@@ -268,12 +272,22 @@
 
         <!-- Texte du logo -->
         <span class="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500">
-          Révis’<span class="text-indigo-600">IA</span>
+          Révis'<span class="text-indigo-600">IA</span>
         </span>
       </a>
 
-      <!-- Liens de navigation -->
-      <div class="flex items-center space-x-6 text-sm font-medium">
+      <!-- Bouton burger (mobile) -->
+      <button id="burgerBtn" class="md:hidden flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Menu">
+        <svg id="burgerIcon" class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+        <svg id="closeIcon" class="w-6 h-6 text-gray-700 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+
+      <!-- Liens de navigation (desktop) -->
+      <div class="hidden md:flex items-center space-x-6 text-sm font-medium">
         <a href="{{ url_for('ui.show_documents') }}"
           class="px-5 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
           Cours
@@ -283,6 +297,13 @@
           class="px-5 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
           Résultats
         </a>
+
+        {% if current_user.is_authenticated %}
+          <a href="{{ url_for('groups.list_groups') }}"
+            class="px-5 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
+            Groupes
+          </a>
+        {% endif %}
 
 
 
@@ -306,16 +327,55 @@
       </div>
 
     </nav>
+
+    <!-- Menu mobile (caché par défaut) -->
+    <div id="mobileMenu" class="hidden md:hidden border-t border-gray-100 bg-white/95 backdrop-blur-md">
+      <div class="px-4 py-4 space-y-2">
+        <a href="{{ url_for('ui.show_documents') }}"
+           class="block px-4 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-center font-medium shadow-sm">
+          Cours
+        </a>
+        <a href="{{ url_for('ui.show_results') }}"
+           class="block px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-center font-medium shadow-sm">
+          Résultats
+        </a>
+        {% if current_user.is_authenticated %}
+          <a href="{{ url_for('groups.list_groups') }}"
+             class="block px-4 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white text-center font-medium shadow-sm">
+            Groupes
+          </a>
+          <div class="pt-2 border-t border-gray-100 mt-2">
+            <div class="text-center text-gray-600 text-sm py-2">👋 {{ current_user.username }}</div>
+            <a href="{{ url_for('auth.logout') }}"
+               class="block px-4 py-3 rounded-lg bg-gray-100 text-gray-700 text-center font-medium hover:bg-gray-200 transition">
+              Déconnexion
+            </a>
+          </div>
+        {% else %}
+          <div class="pt-2 border-t border-gray-100 mt-2 space-y-2">
+            <a href="{{ url_for('auth.login') }}"
+               class="block px-4 py-3 rounded-lg border border-blue-500 text-blue-600 text-center font-medium hover:bg-blue-50 transition">
+              🔑 Connexion
+            </a>
+            <a href="{{ url_for('auth.register') }}"
+               class="block px-4 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-center font-medium shadow-sm">
+              ✍️ Inscription
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
   </header>
 
   <!-- Main -->
-  <main class="container mx-auto flex-1 mt-24 p-6">
+  <main class="container mx-auto flex-1 mt-24 px-4 py-4 sm:p-6">
     {% with messages = get_flashed_messages(with_categories=True) %}
       {% if messages %}
         <div class="max-w-md mx-auto mb-6">
           {% for category, message in messages %}
             <div class="p-3 rounded mb-2 text-sm
                         {% if category == 'error' %}bg-red-100 text-red-700
+                        {% elif category == 'warning' %}bg-yellow-100 text-yellow-700
                         {% else %}bg-green-100 text-green-700{% endif %}">
               {{ message }}
             </div>
@@ -325,6 +385,8 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+
+
 
   <!-- Système de modal unifié -->
   <div id="unified-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 unified-modal">
@@ -365,8 +427,20 @@
     display: inline-block;
     animation: footerScroll 25s linear infinite;
   }
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-modal {
+    animation: modalSlideIn 0.2s ease-out;
+  }
   </style>
-
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>

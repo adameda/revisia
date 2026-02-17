@@ -1,24 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Inscription{% endblock %}
 {% block content %}
+
 <div class="max-w-md mx-auto bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-lg border border-gray-100 animate-fade-in">
   <h1 class="text-3xl font-bold text-center mb-6 bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
     Créer un compte
   </h1>
 
-  <form method="POST" class="space-y-5">
-    <input type="text" name="username" placeholder="Nom d'utilisateur" required
-           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
-    <input type="email" name="email" placeholder="Email" required
-           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
-    <input type="password" name="password" placeholder="Mot de passe" required
-           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+  {% if not registration_enabled %}
+    <div class="bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg px-4 py-3 text-center mb-4">
+      🚫 Les inscriptions sont désactivées pour le moment.<br>
+      Merci de contacter l’administrateur si besoin.
+    </div>
+  {% else %}
+    <form method="POST" class="space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="username" placeholder="Nom d'utilisateur" required
+             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+      <input type="email" name="email" placeholder="Email" required
+             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+      <input type="password" name="password" placeholder="Mot de passe" required
+             class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
 
-    <button type="submit"
-            class="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-lg shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
-      S’inscrire
-    </button>
-  </form>
+      <button type="submit"
+              class="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-lg shadow hover:opacity-90 transform hover:-translate-y-0.5 transition">
+        S’inscrire
+      </button>
+    </form>
+  {% endif %}
 
   <p class="mt-6 text-center text-sm text-gray-600">
     Déjà un compte ? 

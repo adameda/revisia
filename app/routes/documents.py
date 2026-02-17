@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -8,12 +9,18 @@ from ..models import Document
 from ..extract import extract_text_from_docx
 
 bp = Blueprint("documents", __name__, url_prefix="/api/documents")
+logger = logging.getLogger("app.documents")
+
+# Rate limiter pour l'upload de fichiers
+from ..extensions import limiter
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
+# Limite : 10 uploads par minute (évite le spam de fichiers)
 @bp.route("/upload", methods=["POST"])
+@limiter.limit("10 per minute")
 @login_required
 def upload_document():
     """
@@ -45,28 +52,35 @@ def upload_document():
 
     # Enregistrement dans la base
     session = SessionLocal()
-    document = Document(
-        id=str(uuid.uuid4()),
-        title=filename,
-        content=text_content,
-        user_id=current_user.id,  # association directe à l'utilisateur connecté
-        subject_id=subject_id if subject_id else None
-    )
-    session.add(document)
-    session.commit()
+    try:
+        document = Document(
+            id=str(uuid.uuid4()),
+            title=filename,
+            content=text_content,
+            user_id=current_user.id,
+            subject_id=subject_id if subject_id else None
+        )
+        session.add(document)
+        session.commit()
 
-    # Sauvegarder les valeurs avant de fermer la session
-    doc_id = document.id
-    doc_title = document.title
-    session.close()
+        doc_id = document.id
+        doc_title = document.title
 
-    return jsonify({
-        "message": "Document enregistré avec succès",
-        "document_id": doc_id,
-        "title": doc_title,
-        "word_count": word_count,
-        "preview": preview
-    }), 201
+        logger.info(f"Document uploadé : '{doc_title}' ({word_count} mots) par {current_user.username}")
+
+        return jsonify({
+            "message": "Document enregistré avec succès",
+            "document_id": doc_id,
+            "title": doc_title,
+            "word_count": word_count,
+            "preview": preview
+        }), 201
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Erreur upload par {current_user.username} : {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
 @bp.route("/<string:document_id>", methods=["DELETE"])
@@ -80,24 +94,85 @@ def delete_document(document_id):
     try:
         document = session.get(Document, document_id)
         if not document:
-            session.close()
             return jsonify({"error": "Document introuvable"}), 404
 
         # Vérification que le document appartient bien à l'utilisateur connecté
         if document.user_id != current_user.id:
-            session.close()
             return jsonify({"error": "Non autorisé"}), 403
+
+        # ⚠️ Vérifier si les questions du document sont utilisées dans des événements actifs
+        from ..models import Question, EventQuiz, Event
+        from datetime import datetime
+        import json
+        
+        # Récupérer toutes les questions du document
+        questions = session.query(Question).filter_by(document_id=document_id).all()
+        question_ids = [q.id for q in questions]
+        
+        if question_ids:
+            # Vérifier si ces questions sont dans des événements actifs
+            now = datetime.now()
+            active_events_with_questions = []
+            
+            active_event_quizzes = session.query(EventQuiz, Event).join(
+                Event, EventQuiz.event_id == Event.id
+            ).filter(
+                Event.start_date <= now,
+                Event.end_date >= now
+            ).all()
+            
+            for quiz, event in active_event_quizzes:
+                quiz_questions = json.loads(quiz.questions)
+                if any(qid in quiz_questions for qid in question_ids):
+                    if event.name not in [e['name'] for e in active_events_with_questions]:
+                        active_events_with_questions.append({
+                            'name': event.name,
+                            'id': event.id
+                        })
+            
+            if active_events_with_questions:
+                event_names = ', '.join([e['name'] for e in active_events_with_questions])
+                return jsonify({
+                    "error": f"❌ Impossible : ce cours contient des questions utilisées dans {len(active_events_with_questions)} événement(s) en cours : {event_names}",
+                    "active_events": active_events_with_questions
+                }), 400
+            
+            # Vérifier événements futurs
+            future_event_quizzes = session.query(EventQuiz, Event).join(
+                Event, EventQuiz.event_id == Event.id
+            ).filter(
+                Event.start_date > now
+            ).all()
+            
+            future_events_with_questions = []
+            for quiz, event in future_event_quizzes:
+                quiz_questions = json.loads(quiz.questions)
+                if any(qid in quiz_questions for qid in question_ids):
+                    if event.name not in [e['name'] for e in future_events_with_questions]:
+                        future_events_with_questions.append({
+                            'name': event.name,
+                            'id': event.id
+                        })
+            
+            if future_events_with_questions:
+                event_names = ', '.join([e['name'] for e in future_events_with_questions])
+                return jsonify({
+                    "error": f"⚠️ Impossible : ce cours contient des questions utilisées dans {len(future_events_with_questions)} événement(s) à venir : {event_names}. Supprimez d'abord les événements.",
+                    "future_events": future_events_with_questions
+                }), 400
 
         session.delete(document)
         session.commit()
-        session.close()
 
-        return jsonify({"message": f"Document supprimé avec succès"}), 200
+        logger.info(f"Document supprimé : '{document.title}' par {current_user.username}")
+        return jsonify({"message": "Document supprimé avec succès"}), 200
 
     except Exception as e:
         session.rollback()
-        session.close()
+        logger.error(f"Erreur suppression document {document_id} : {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
 @bp.route("/<string:document_id>/content", methods=["GET"])
@@ -110,26 +185,20 @@ def get_document_content(document_id):
     try:
         document = session.get(Document, document_id)
         if not document:
-            session.close()
             return jsonify({"error": "Document introuvable"}), 404
 
-        # Vérification que le document appartient bien à l'utilisateur connecté
         if document.user_id != current_user.id:
-            session.close()
             return jsonify({"error": "Non autorisé"}), 403
 
-        content = document.content
-        title = document.title
-        session.close()
-
         return jsonify({
-            "title": title,
-            "content": content
+            "title": document.title,
+            "content": document.content
         }), 200
 
     except Exception as e:
-        session.close()
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
 @bp.route("/<string:document_id>/subject", methods=["PUT"])
@@ -145,21 +214,20 @@ def update_document_subject(document_id):
     try:
         document = session.get(Document, document_id)
         if not document:
-            session.close()
             return jsonify({"error": "Document introuvable"}), 404
 
-        # Vérification que le document appartient bien à l'utilisateur connecté
         if document.user_id != current_user.id:
-            session.close()
             return jsonify({"error": "Non autorisé"}), 403
 
         document.subject_id = subject_id
         session.commit()
-        session.close()
+
+        logger.info(f"Matière du document '{document.title}' changée par {current_user.username}")
 
         return jsonify({"message": "Matière mise à jour"}), 200
 
     except Exception as e:
         session.rollback()
-        session.close()
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()

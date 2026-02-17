@@ -71,7 +71,7 @@
         <div class="w-20 h-20 border-4 border-blue-200 rounded-full"></div>
         <div class="w-20 h-20 border-4 border-blue-600 rounded-full border-t-transparent absolute top-0 left-0 animate-spin"></div>
         <div class="absolute inset-0 flex items-center justify-center">
-          <span class="text-2xl">🤖</span>
+          <span class="text-2xl"></span>
         </div>
       </div>
     </div>
@@ -141,9 +141,9 @@
 <!-- Contenu principal -->
 <div class="max-w-7xl mx-auto">
   <!-- En-tête avec titre et actions -->
-  <div class="flex items-center justify-between mb-8">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
     <div>
-      <h1 class="text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+      <h1 class="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
         Mes Cours
       </h1>
       {% if mock_mode %}
@@ -152,14 +152,31 @@
       </div>
       {% endif %}
     </div>
-    <div class="flex gap-3">
+    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+
+      <!-- Indicateur de quota -->
+      {% if quiz_limit_enabled %}
+      <div id="quotaBadge" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium
+            {% if quota_remaining == 0 %}bg-red-100 text-red-700 border border-red-200
+            {% elif quota_remaining <= 2 %}bg-amber-100 text-amber-700 border border-amber-200
+            {% else %}bg-emerald-100 text-emerald-700 border border-emerald-200{% endif %}">
+        <span id="quotaText"><span id="quotaRemaining">{{ quota_remaining }}</span>/{{ daily_limit }}</span>
+        <span class="hidden sm:inline">générations restantes</span>
+      </div>
+      {% else %}
+      <div id="quotaBadge" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">
+        <span id="quotaText">Illimité</span>
+        <span class="hidden sm:inline">générations</span>
+      </div>
+      {% endif %}
+      
       <button id="createSubjectBtn" 
-              class="px-4 py-2 bg-white border-2 border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition-all font-medium shadow-sm">
-        ➕ Nouvelle matière
+              class="px-3 sm:px-4 py-2 bg-white border-2 border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition-all font-medium shadow-sm text-xs sm:text-sm">
+        ➕ <span class="hidden sm:inline">Nouvelle </span>matière
       </button>
       <a href="{{ url_for('ui.upload', subject=current_filter if current_filter not in ['all', 'none', None] else '') }}"
-         class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition-all font-medium">
-        📄 Ajouter un cours
+         class="px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow hover:opacity-90 transition-all font-medium text-xs sm:text-sm">
+        📄 <span class="hidden sm:inline">Ajouter un </span>cours
       </a>
     </div>
   </div>
@@ -226,8 +243,8 @@
     <!-- Effet lumineux subtil -->
     <div class="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50 opacity-0 hover:opacity-80 transition duration-500 rounded-2xl pointer-events-none"></div>
 
-    <!-- Structure en grid avec colonnes fixes -->
-    <div class="grid grid-cols-[minmax(200px,1fr)_auto_auto_auto] gap-4 items-center relative z-10">
+    <!-- Structure en grid responsive -->
+    <div class="flex flex-col sm:grid sm:grid-cols-[minmax(200px,1fr)_auto_auto_auto] gap-3 sm:gap-4 items-start sm:items-center relative z-10">
       
       <!-- Colonne 1 : Titre (flexible) -->
       <div class="min-w-0">
@@ -288,7 +305,7 @@
       </div>
 
       <!-- Colonne 4 : Actions quiz (fixe) -->
-      <div class="flex items-center gap-2 whitespace-nowrap">
+      <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
         {% set quiz_exists = doc.questions|length > 0 %}
 
         {% if quiz_exists %}
@@ -310,11 +327,19 @@
                   title="Génère d'abord le quiz pour pouvoir jouer">
             Jouer
           </button>
-          <!-- Générer actif -->
+          <!-- Générer actif (respecte le quota ou illimité) -->
+          {% if not quiz_limit_enabled or quota_remaining > 0 %}
           <button data-generate="{{ doc.id }}" 
                   class="btn btn-yellow hover:brightness-105 generate-btn">
             Générer
           </button>
+          {% else %}
+          <button disabled
+                  class="btn btn-yellow opacity-60 cursor-not-allowed generate-btn"
+                  title="Limite atteinte, reviens demain !">
+            Générer
+          </button>
+          {% endif %}
         {% endif %}
 
         <!-- Supprimer -->
@@ -332,7 +357,6 @@
 {% else %}
 <!-- Message liste vide -->
 <div id="empty-message" class="text-center py-16">
-  <div class="text-6xl mb-4">📚</div>
   <p class="text-gray-500 text-lg mb-6">
     {{ empty_message.title if empty_message else 'Aucun cours pour le moment.' }}
   </p>

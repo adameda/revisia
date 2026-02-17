@@ -2,6 +2,32 @@
 document.addEventListener("DOMContentLoaded", () => {
   console.log("✨ Révis'IA front prêt !");
 
+  // === Token CSRF ===
+  // On le lit depuis la balise <meta> dans base.html.
+  // Il sera envoyé dans le header de chaque requête POST/PUT/DELETE
+  // pour prouver que la requête vient bien de notre site.
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+  // Helper : construit les headers avec le token CSRF inclus
+  function csrfHeaders(extra = {}) {
+    return { "X-CSRFToken": csrfToken, ...extra };
+  }
+
+  // === Menu burger mobile ===
+  const burgerBtn = document.getElementById("burgerBtn");
+  const mobileMenu = document.getElementById("mobileMenu");
+  const burgerIcon = document.getElementById("burgerIcon");
+  const closeIcon = document.getElementById("closeIcon");
+
+  if (burgerBtn && mobileMenu) {
+    burgerBtn.addEventListener("click", () => {
+      const isOpen = !mobileMenu.classList.contains("hidden");
+      mobileMenu.classList.toggle("hidden");
+      burgerIcon.classList.toggle("hidden");
+      closeIcon.classList.toggle("hidden");
+    });
+  }
+
   // === Système de modal unifié ===
   const unifiedModal = document.getElementById("unified-modal");
   const unifiedModalTitle = document.getElementById("unified-modal-title");
@@ -192,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
         cancelText: "Annuler",
         onConfirm: async () => {
           try {
-            const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
+            const res = await fetch(`/api/documents/${id}`, { method: "DELETE", headers: csrfHeaders() });
             const data = await res.json();
 
             if (res.ok) {
@@ -360,28 +386,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const card = btn.closest("[data-doc-id]");
       const wordCount = parseInt(card.dataset.wordCount);
       
-      // Calculer le nombre de questions selon le nombre de mots
-      let nbQuestions = 20;
-      if (wordCount < 800) {
-        nbQuestions = 20;
-      } else if (wordCount <= 1500) {
-        nbQuestions = 30;
-      } else {
-        nbQuestions = 40;
-      }
-
       // Afficher la modal
       progressModal.classList.remove("hidden");
       progressModal.classList.add("flex");
-      questionCount.textContent = nbQuestions;
       questionsInfo.classList.remove("hidden");
-      
-      // Animation de progression simulée
+
+      // Animation de progression simulée (nombre de questions sera mis à jour après le fetch)
+      let nbQuestions = null;
       let progress = 0;
-      const progressSteps = [
+      let progressSteps = [
         { percent: 20, time: 500, info: "Connexion à l'IA...", status: "Préparation de la requête..." },
         { percent: 40, time: 2000, info: "Analyse du cours...", status: "Extraction des concepts clés..." },
-        { percent: 70, time: 4000, info: "Génération des questions...", status: `Création de ${nbQuestions} questions...` },
+        { percent: 70, time: 4000, info: "Génération des questions...", status: `Création des questions...` },
         { percent: 90, time: 1000, info: "Validation...", status: "Vérification de la cohérence..." },
       ];
 
@@ -392,32 +408,41 @@ document.addEventListener("DOMContentLoaded", () => {
           progressBar.style.width = `${progress}%`;
           progressPercent.textContent = `${progress}%`;
           progressInfo.textContent = currentStep.info;
-          progressStatus.textContent = currentStep.status;
+          progressStatus.textContent = currentStep.status.replace("questions...", nbQuestions ? `${nbQuestions} questions...` : "questions...");
         }
       }, 100);
 
       try {
-        const res = await fetch(`/api/quizzes/generate?document_id=${docId}`, { method: "POST" });
+        const res = await fetch(`/api/quizzes/generate?document_id=${docId}`, { method: "POST", headers: csrfHeaders() });
         const data = await res.json();
 
         clearInterval(progressInterval);
-        
+
+        // Mettre à jour le vrai nombre de questions générées
+        nbQuestions = data.total_questions || (data.questions ? data.questions.length : null);
+        questionCount.textContent = nbQuestions;
+
         // Compléter la progression
         progress = 100;
         progressBar.style.width = "100%";
         progressPercent.textContent = "100%";
         progressInfo.textContent = "Terminé !";
-        progressStatus.textContent = "Quiz généré avec succès ! 🎉";
+        progressStatus.textContent = `Quiz généré avec succès ! 🎉 (${nbQuestions} questions)`;
 
         if (res.ok) {
+          // Mettre à jour le compteur de quota
+          if (data.quota_remaining !== undefined) {
+            updateQuotaDisplay(data.quota_remaining);
+          }
+
           // Attendre un peu pour montrer la complétion
           await new Promise(resolve => setTimeout(resolve, 1000));
-          
+
           // Mettre à jour les boutons dynamiquement (sans refresh)
           const playBtn = card.querySelector(".play-btn");
           const generateBtn = card.querySelector(".generate-btn");
           const buttonsContainer = generateBtn.parentElement;
-          
+
           // Si le bouton Jouer est un <button>, on le remplace par un <a> fonctionnel
           if (playBtn && playBtn.tagName === 'BUTTON') {
             // Créer un nouveau lien <a> pour "Jouer"
@@ -425,7 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
             newPlayLink.href = `/quizzes/play/${docId}`;
             newPlayLink.className = "btn btn-green hover:brightness-105 play-btn";
             newPlayLink.textContent = "Jouer";
-            
+
             // Remplacer l'ancien bouton par le nouveau lien
             playBtn.replaceWith(newPlayLink);
           } else if (playBtn && playBtn.tagName === 'A') {
@@ -436,21 +461,25 @@ document.addEventListener("DOMContentLoaded", () => {
             // Retirer l'attribut disabled s'il existe
             playBtn.removeAttribute("disabled");
           }
-          
+
           // Désactiver le bouton Générer (puisque le quiz existe)
           generateBtn.disabled = true;
           generateBtn.classList.add("opacity-60", "cursor-not-allowed");
           generateBtn.classList.remove("hover:brightness-105");
           generateBtn.textContent = "Généré";
           generateBtn.title = "Quiz déjà généré";
-          
+
           // Fermer la modal
           progressModal.classList.add("hidden");
           progressModal.classList.remove("flex");
-          
+
           // Notification succès
-          showNotification("✅ Quiz généré avec succès !", "success");
+          showNotification(`✅ Quiz généré avec succès ! (${nbQuestions} questions)`, "success");
         } else {
+          // Gestion des erreurs spécifiques
+          if (res.status === 429 && data.quota_remaining !== undefined) {
+            updateQuotaDisplay(data.quota_remaining);
+          }
           throw new Error(data.error || "Erreur pendant la génération");
         }
       } catch (err) {
@@ -461,6 +490,37 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+
+  // --- Mise à jour dynamique du quota ---
+  function updateQuotaDisplay(remaining) {
+    const badge = document.getElementById("quotaBadge");
+    const quotaRemaining = document.getElementById("quotaRemaining");
+    if (!badge || !quotaRemaining) return;
+
+    quotaRemaining.textContent = remaining;
+
+    // Mettre à jour les classes de couleur
+    badge.classList.remove(
+      "bg-emerald-100", "text-emerald-700", "border-emerald-200",
+      "bg-amber-100", "text-amber-700", "border-amber-200",
+      "bg-red-100", "text-red-700", "border-red-200"
+    );
+    if (remaining === 0) {
+      badge.classList.add("bg-red-100", "text-red-700", "border-red-200");
+      // Désactiver tous les boutons Générer restants
+      document.querySelectorAll("[data-generate]").forEach(btn => {
+        btn.disabled = true;
+        btn.removeAttribute("data-generate");
+        btn.classList.add("opacity-60", "cursor-not-allowed");
+        btn.classList.remove("hover:brightness-105");
+        btn.title = "Limite atteinte, reviens demain !";
+      });
+    } else if (remaining <= 2) {
+      badge.classList.add("bg-amber-100", "text-amber-700", "border-amber-200");
+    } else {
+      badge.classList.add("bg-emerald-100", "text-emerald-700", "border-emerald-200");
+    }
+  }
 
   // Fonction utilitaire pour afficher des notifications
   function showNotification(message, type = "info") {
@@ -510,7 +570,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ? q.choices
                 .map(
                   (choice) => `
-            <button class="choice-btn w-full border border-gray-300 rounded-lg py-2 my-1 hover:bg-gray-50 transition">
+            <button class="choice-btn w-full border border-gray-300 rounded-lg py-3 px-4 my-1 hover:bg-gray-50 transition text-left text-sm sm:text-base min-h-[44px]">
               ${choice}
             </button>`
                 )
@@ -585,7 +645,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/api/results/save", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
             document_id: quizContainer.dataset.documentId || null,
             score: score,
@@ -755,7 +815,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/api/subjects", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ name })
         });
 
@@ -831,7 +891,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // Créer la matière d'abord
           const subjectRes = await fetch("/api/subjects", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: csrfHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ name: newName })
           });
 
@@ -857,6 +917,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const res = await fetch("/api/documents/upload", { 
           method: "POST", 
+          headers: csrfHeaders(),
           body: formData 
         });
         
@@ -944,7 +1005,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Envoyer la requête de mise à jour
         const res = await fetch(`/api/documents/${currentDocIdForSubjectChange}/subject`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: csrfHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ subject_id: subjectId })
         });
 
@@ -1006,7 +1067,8 @@ document.addEventListener("DOMContentLoaded", () => {
         onConfirm: async () => {
           try {
             const res = await fetch(`/api/subjects/${subjectId}`, {
-              method: "DELETE"
+              method: "DELETE",
+              headers: csrfHeaders()
             });
 
             const data = await res.json();

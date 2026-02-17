@@ -114,6 +114,21 @@ def show_documents():
                     selected_subject = subject
                     break
 
+    # Calcul du quota restant
+    from ..models import QuizGeneration
+    from datetime import datetime, time
+    from flask import current_app
+    today_start = datetime.combine(datetime.now().date(), time.min)
+    with SessionLocal() as quota_session:
+        daily_count = quota_session.query(QuizGeneration).filter(
+            QuizGeneration.user_id == current_user.id,
+            QuizGeneration.created_at >= today_start
+        ).count()
+    daily_limit = current_app.config.get("DAILY_QUIZ_LIMIT", 8)
+    quota_remaining = max(0, daily_limit - daily_count)
+
+    from flask import current_app
+    quiz_limit_enabled = current_app.config.get("QUIZ_LIMIT_ENABLED", False)
     return render_template(
         "documents.html", 
         documents=docs_with_meta, 
@@ -122,7 +137,10 @@ def show_documents():
         total_docs=total_docs,
         empty_message=empty_message,
         selected_subject=selected_subject,
-        mock_mode=os.getenv("MOCK_GEMINI") == "True"
+        mock_mode=os.getenv("MOCK_GEMINI") == "True",
+        quota_remaining=quota_remaining,
+        daily_limit=daily_limit,
+        quiz_limit_enabled=quiz_limit_enabled,
     )
 
 @bp.route("/upload")
@@ -158,46 +176,46 @@ def show_quiz(document_id):
 def play_quiz(document_id):
     from random import sample
     session = SessionLocal()
+    try:
+        document = session.get(Document, document_id)
+        if not document:
+            return render_template("404.html", message="Document introuvable"), 404
 
-    document = session.get(Document, document_id)
-    if not document:
-        session.close()
-        return render_template("404.html", message="Document introuvable"), 404
+        questions = session.query(Question).filter_by(document_id=document_id).all()
 
-    questions = session.query(Question).filter_by(document_id=document_id).all()
-    session.close()
+        if not questions:
+            return render_template(
+                "quiz_play.html",
+                title=document.title,
+                document=document,
+                questions=[],
+                message="Aucune question générée pour ce document."
+            )
 
-    if not questions:
+        if len(questions) > 10:
+            questions = sample(questions, 10)
+
+        # Convertir les questions en dictionnaires simples
+        questions_data = [
+            {
+                "id": q.id,
+                "question": q.question,
+                "type": q.type.value if hasattr(q.type, "value") else q.type,
+                "choices": q.choices,
+                "answer": q.answer,
+                "explanation": q.explanation
+            }
+            for q in questions
+        ]
+
         return render_template(
             "quiz_play.html",
             title=document.title,
             document=document,
-            questions=[],
-            message="Aucune question générée pour ce document."
+            questions=questions_data
         )
-
-    if len(questions) > 10:
-        questions = sample(questions, 10)
-
-    # Convertir les questions en dictionnaires simples
-    questions_data = [
-        {
-            "id": q.id,
-            "question": q.question,
-            "type": q.type.value if hasattr(q.type, "value") else q.type,
-            "choices": q.choices,
-            "answer": q.answer,
-            "explanation": q.explanation
-        }
-        for q in questions
-    ]
-
-    return render_template(
-        "quiz_play.html",
-        title=document.title,
-        document=document,
-        questions=questions_data
-    )
+    finally:
+        session.close()
 
 @bp.route("/results")
 @login_required

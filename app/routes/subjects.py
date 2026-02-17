@@ -1,11 +1,15 @@
 # app/routes/subjects.py
 import uuid
 import random
+import logging
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from ..db import SessionLocal
 from ..models import Subject, Document
 from sqlalchemy import func
+
+# Logger pour tracer les opérations sur les matières
+logger = logging.getLogger("app.subjects")
 
 bp = Blueprint("subjects", __name__, url_prefix="/api/subjects")
 
@@ -52,12 +56,12 @@ def get_subjects():
                 "created_at": subject.created_at.isoformat()
             })
         
-        session.close()
         return jsonify(subjects_data), 200
         
     except Exception as e:
-        session.close()
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
 @bp.route("/", methods=["POST"])
@@ -81,7 +85,6 @@ def create_subject():
         ).first()
         
         if existing:
-            session.close()
             return jsonify({
                 "error": "Cette matière existe déjà",
                 "existing_id": existing.id
@@ -99,23 +102,22 @@ def create_subject():
         
         session.add(subject)
         session.commit()
-        
-        subject_id = subject.id
-        subject_name = subject.name
-        subject_color = subject.color
-        session.close()
-        
+
+        logger.info(f"Matière créée : '{subject.name}' par {current_user.username}")
+
         return jsonify({
             "message": "Matière créée avec succès",
-            "id": subject_id,
-            "name": subject_name,
-            "color": subject_color
+            "id": subject.id,
+            "name": subject.name,
+            "color": subject.color
         }), 201
         
     except Exception as e:
         session.rollback()
-        session.close()
+        logger.error(f"Erreur création matière par {current_user.username} : {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
 @bp.route("/<string:subject_id>", methods=["PUT"])
@@ -130,7 +132,6 @@ def update_subject(subject_id):
     try:
         subject = session.get(Subject, subject_id)
         if not subject or subject.user_id != current_user.id:
-            session.close()
             return jsonify({"error": "Matière introuvable"}), 404
         
         if "name" in data:
@@ -139,14 +140,14 @@ def update_subject(subject_id):
             subject.color = data["color"]
         
         session.commit()
-        session.close()
         
         return jsonify({"message": "Matière mise à jour"}), 200
         
     except Exception as e:
         session.rollback()
-        session.close()
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 
 @bp.route("/<string:subject_id>", methods=["DELETE"])
@@ -158,41 +159,72 @@ def delete_subject(subject_id):
     session = SessionLocal()
     
     try:
-        # Vérifier que la matière existe et appartient à l'utilisateur
         subject = session.get(Subject, subject_id)
         if not subject or subject.user_id != current_user.id:
-            session.close()
             return jsonify({"error": "Matière introuvable"}), 404
         
-        # Vérifier qu'il reste au moins une autre matière
         total_subjects = session.query(Subject).filter_by(user_id=current_user.id).count()
         if total_subjects <= 1:
-            session.close()
             return jsonify({"error": "Impossible de supprimer la dernière matière"}), 400
         
-        # Vérifier que la matière est vide
         doc_count = session.query(Document).filter_by(
             user_id=current_user.id,
             subject_id=subject_id
         ).count()
         
         if doc_count > 0:
-            session.close()
             return jsonify({
                 "error": f"Cette matière contient {doc_count} cours. Déplacez ou supprimez les cours d'abord.",
                 "document_count": doc_count
             }), 400
         
-        # Supprimer la matière (elle est vide)
+        from ..models import Event, GroupSubject
+        from datetime import datetime
+        
+        now = datetime.now()
+        active_events = session.query(Event).filter(
+            Event.subject_id == subject_id,
+            Event.start_date <= now,
+            Event.end_date >= now
+        ).count()
+        
+        if active_events > 0:
+            return jsonify({
+                "error": f"❌ Impossible : {active_events} événement(s) en cours utilise(nt) cette matière.",
+                "active_events": active_events
+            }), 400
+        
+        future_events = session.query(Event).filter(
+            Event.subject_id == subject_id,
+            Event.start_date > now
+        ).count()
+        
+        if future_events > 0:
+            return jsonify({
+                "error": f"⚠️ Impossible : {future_events} événement(s) à venir utilise(nt) cette matière. Supprimez d'abord les événements.",
+                "future_events": future_events
+            }), 400
+        
+        group_links = session.query(GroupSubject).filter_by(subject_id=subject_id).count()
+        
+        if group_links > 0:
+            return jsonify({
+                "error": f"⚠️ Cette matière est liée à {group_links} groupe(s). Retirez-la des groupes d'abord.",
+                "group_links": group_links
+            }), 400
+        
         session.delete(subject)
         session.commit()
-        session.close()
-        
+
+        logger.info(f"Matière supprimée : '{subject.name}' par {current_user.username}")
+
         return jsonify({
             "message": "Matière supprimée avec succès"
         }), 200
         
     except Exception as e:
         session.rollback()
-        session.close()
+        logger.error(f"Erreur suppression matière {subject_id} : {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()

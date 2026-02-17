@@ -1,4 +1,5 @@
 # app/routes/auth.py
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import (
     LoginManager,
@@ -11,6 +12,11 @@ from ..db import SessionLocal
 from ..models import User
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
+logger = logging.getLogger("app.auth")
+
+# Import du rate limiter (défini dans extensions.py)
+# On l'applique sur login/register pour bloquer les attaques par brute-force
+from ..extensions import limiter
 
 # --- Initialisation Flask-Login ---
 login_manager = LoginManager()
@@ -21,16 +27,24 @@ login_manager.login_view = "auth.login"
 @login_manager.user_loader
 def load_user(user_id):
     session = SessionLocal()
-    user = session.get(User, user_id)
-    session.close()
-    return user
+    try:
+        user = session.get(User, user_id)
+        return user
+    finally:
+        session.close()
 
 
 # --- Page d'inscription ---
+# Limite : 5 inscriptions par minute par IP (anti-spam)
 @bp.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def register():
+    from flask import current_app
     if current_user.is_authenticated:
         return redirect(url_for("ui.home"))
+
+    if not current_app.config.get("REGISTRATION_ENABLED", True):
+        return render_template("register.html", registration_enabled=False)
 
     if request.method == "POST":
         username = request.form.get("username")
@@ -42,28 +56,36 @@ def register():
             return redirect(url_for("auth.register"))
 
         session = SessionLocal()
-        existing = session.query(User).filter(
-            (User.email == email) | (User.username == username)
-        ).first()
-        if existing:
-            flash("Ce compte existe déjà.", "error")
-            session.close()
+        try:
+            existing = session.query(User).filter(
+                (User.email == email) | (User.username == username)
+            ).first()
+            if existing:
+                flash("Ce compte existe déjà.", "error")
+                return redirect(url_for("auth.register"))
+
+            user = User(username=username, email=email)
+            user.set_password(password)
+            session.add(user)
+            session.commit()
+
+            logger.info(f"Inscription : {username} ({email})")
+            flash("✅ Inscription réussie ! Vous pouvez maintenant vous connecter.")
+            return redirect(url_for("auth.login"))
+        except Exception as e:
+            session.rollback()
+            flash(f"Erreur : {e}", "error")
             return redirect(url_for("auth.register"))
+        finally:
+            session.close()
 
-        user = User(username=username, email=email)
-        user.set_password(password)
-        session.add(user)
-        session.commit()
-        session.close()
-
-        flash("✅ Inscription réussie ! Vous pouvez maintenant vous connecter.")
-        return redirect(url_for("auth.login"))
-
-    return render_template("register.html")
+    return render_template("register.html", registration_enabled=True)
 
 
 # --- Page de connexion ---
+# Limite : 5 tentatives par minute par IP (anti brute-force)
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("ui.home"))
@@ -73,17 +95,20 @@ def login():
         password = request.form.get("password")
 
         session = SessionLocal()
-        user = session.query(User).filter_by(email=email).first()
+        try:
+            user = session.query(User).filter_by(email=email).first()
 
-        if not user or not user.check_password(password):
-            flash("❌ Identifiants incorrects.", "error")
+            if not user or not user.check_password(password):
+                logger.warning(f"Échec connexion : {email}")
+                flash("❌ Identifiants incorrects.", "error")
+                return redirect(url_for("auth.login"))
+
+            login_user(user)
+            logger.info(f"Connexion : {user.username} ({email})")
+            flash(f"👋 Bienvenue, {user.username} !")
+            return redirect(url_for("ui.home"))
+        finally:
             session.close()
-            return redirect(url_for("auth.login"))
-
-        login_user(user)
-        session.close()
-        flash(f"👋 Bienvenue, {user.username} !")
-        return redirect(url_for("ui.home"))
 
     return render_template("login.html")
 
@@ -92,6 +117,7 @@ def login():
 @bp.route("/logout")
 @login_required
 def logout():
+    logger.info(f"Déconnexion : {current_user.username}")
     logout_user()
     flash("👋 Déconnecté avec succès.")
     return redirect(url_for("auth.login"))

@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      FLASK_ENV: development
+      FLASK_DEBUG: "False"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MOCK_GEMINI: ${MOCK_GEMINI}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_API_KEY_2: ${GEMINI_API_KEY_2}
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED}
+      QUIZ_LIMIT_ENABLED: ${QUIZ_LIMIT_ENABLED}
+      DAILY_QUIZ_LIMIT: ${DAILY_QUIZ_LIMIT}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

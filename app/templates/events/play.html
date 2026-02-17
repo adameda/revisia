@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.name }} - Quiz {{ quiz.quiz_number }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- En-tête fixe -->
+    <div class="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-6 sm:mb-8 sticky top-16 sm:top-4 z-10">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900">{{ event.name }}</h1>
+                <p class="text-gray-600">Quiz {{ quiz.quiz_number }} / 5</p>
+            </div>
+            <div class="text-right">
+                <div class="text-3xl font-bold text-blue-600" id="timer">00:00</div>
+                <div class="text-sm text-gray-500">Temps indicatif</div>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Question <span id="currentQuestion">1</span> / {{ questions | length }}</span>
+                <span><span id="answeredCount">0</span> réponses</span>
+            </div>
+            <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div id="progressBar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Questions -->
+    <form id="quizForm">
+        <div class="space-y-6">
+            {% for question in questions %}
+            <div class="bg-white rounded-xl shadow-md p-6 question-card" data-question-number="{{ loop.index }}">
+                <div class="flex items-start gap-4 mb-4">
+                    <div class="flex-shrink-0 w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                        {{ loop.index }}
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ question.question }}</h3>
+                        {% if question.type.value == 'qcm' %}
+                        <div class="space-y-3">
+                            {% for choice in question.choices %}
+                            <label class="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all group">
+                                <input type="radio" name="question_{{ question.id }}" value="{{ choice }}"
+                                       class="w-5 h-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                                       onchange="updateProgress()">
+                                <span class="ml-3 text-gray-900 group-hover:text-blue-900 font-medium">{{ choice }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <textarea name="question_{{ question.id }}" rows="4"
+                                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                  placeholder="Votre réponse..."
+                                  oninput="updateProgress()"></textarea>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-8 bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                    <p class="font-semibold mb-1">Attention</p>
+                    <p>Une fois soumis, vous ne pourrez pas modifier vos réponses.</p>
+                </div>
+                <button type="button" onclick="submitQuiz()" id="submitBtn" disabled
+                        class="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Soumettre mes réponses</span>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+let startTime = Date.now();
+let timerInterval;
+let totalQuestions = {{ questions | length }};
+
+function updateTimer() {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    document.getElementById('timer').textContent = 
+        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+timerInterval = setInterval(updateTimer, 1000);
+
+function updateProgress() {
+    const form = document.getElementById('quizForm');
+    const formData = new FormData(form);
+    let answeredCount = 0;
+    {% for question in questions %}
+    const answer{{ loop.index }} = formData.get('question_{{ question.id }}');
+    if (answer{{ loop.index }} && answer{{ loop.index }}.trim() !== '') answeredCount++;
+    {% endfor %}
+    document.getElementById('answeredCount').textContent = answeredCount;
+    document.getElementById('progressBar').style.width = (answeredCount / totalQuestions * 100) + '%';
+    const submitBtn = document.getElementById('submitBtn');
+    if (answeredCount === totalQuestions) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+function submitQuiz() {
+    if (!confirm('Soumettre vos réponses ? Vous ne pourrez pas les modifier.')) return;
+    const form = document.getElementById('quizForm');
+    const formData = new FormData(form);
+    const answers = {};
+    {% for question in questions %}
+    const a{{ loop.index }} = formData.get('question_{{ question.id }}');
+    if (a{{ loop.index }}) answers['{{ question.id }}'] = a{{ loop.index }};
+    {% endfor %}
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span>Envoi en cours...</span>';
+
+    fetch('{{ url_for("events.submit_quiz", event_id=event.id, quiz_number=quiz.quiz_number) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify({ answers: answers, time_spent: timeSpent })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            clearInterval(timerInterval);
+            window.removeEventListener('beforeunload', preventUnload);
+            window.location.href = data.redirect;
+        } else {
+            alert('Erreur : ' + (data.error || 'Une erreur est survenue'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>Soumettre mes réponses</span>';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Une erreur est survenue.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Soumettre mes réponses</span>';
+    });
+}
+
+function preventUnload(e) { e.preventDefault(); e.returnValue = ''; }
+window.addEventListener('beforeunload', preventUnload);
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            document.getElementById('currentQuestion').textContent = entry.target.dataset.questionNumber;
+        }
+    });
+}, { root: null, rootMargin: '-100px', threshold: 0.5 });
+document.querySelectorAll('.question-card').forEach(card => observer.observe(card));
+</script>
+{% endblock %}

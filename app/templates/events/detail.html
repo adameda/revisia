@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.name }} - Détails{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- En-tête -->
+    <div class="mb-8">
+        <a href="{{ url_for('events.group_events', group_id=event.group_id) }}"
+           class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition font-semibold mb-2">
+          <span>←</span> <span>Retour aux événements</span>
+        </a>
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div class="flex-1">
+                <h1 class="text-3xl font-bold text-gray-900">{{ event.name }}</h1>
+                <p class="text-gray-600">Groupe : {{ event.group.name }} | Matière : {{ event.subject.name }}</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                {% set status = event.get_status() %}
+                {% if status == 'future' %}
+                <span class="px-4 py-2 rounded-full text-xs font-bold bg-gray-100 text-gray-700 flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>À VENIR</span>
+                </span>
+                {% elif status == 'ended' %}
+                <span class="px-4 py-2 rounded-full text-xs font-bold bg-green-100 text-green-700 flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>TERMINÉ</span>
+                </span>
+                {% else %}
+                <span class="px-4 py-2 rounded-full text-xs font-bold bg-blue-100 text-blue-700 flex items-center gap-1.5 animate-pulse">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>EN COURS</span>
+                </span>
+                {% endif %}
+                {% if is_owner %}
+                <button onclick="confirmDeleteEvent()"
+                        class="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition font-semibold text-sm">
+                    Supprimer
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3 sm:gap-4 text-sm text-gray-600">
+            <div class="flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Début : {{ event.start_date.strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Fin : {{ event.end_date.strftime('%d/%m/%Y %H:%M') }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progression personnelle -->
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl shadow-lg p-6 text-white mb-8">
+        <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            <span>Votre progression</span>
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="text-center">
+                <div class="text-4xl font-bold mb-1">{{ completed_count }} / 5</div>
+                <div class="text-sm opacity-90">Quiz complétés</div>
+            </div>
+            <div class="text-center">
+                <div class="text-4xl font-bold mb-1">{{ user_correct }} / {{ user_total_q }}</div>
+                <div class="text-sm opacity-90">Bonnes réponses</div>
+            </div>
+            <div class="text-center">
+                {% if completed_count > 0 %}
+                <div class="text-4xl font-bold mb-1">{{ (user_correct / completed_count) | round(1) | int }} / 20</div>
+                {% else %}
+                <div class="text-4xl font-bold mb-1">-</div>
+                {% endif %}
+                <div class="text-sm opacity-90">Moyenne par quiz</div>
+            </div>
+        </div>
+        <div class="mt-6">
+            <div class="w-full h-4 bg-white bg-opacity-20 rounded-full overflow-hidden">
+                <div class="h-full bg-white rounded-full transition-all duration-500" 
+                     style="width: {{ (completed_count / 5 * 100) | round }}%"></div>
+            </div>
+        </div>
+        <div class="mt-6 text-center">
+            {% if can_play and next_quiz %}
+            <a href="{{ url_for('events.play_quiz', event_id=event.id, quiz_number=next_quiz) }}" 
+               class="inline-flex items-center gap-2 bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Jouer au quiz {{ next_quiz }}</span>
+            </a>
+            {% elif status == 'future' %}
+            <button disabled class="inline-flex items-center gap-2 bg-gray-200 text-gray-500 px-8 py-3 rounded-lg font-bold cursor-not-allowed">
+                <span>Événement pas encore commencé</span>
+            </button>
+            {% elif status == 'ended' %}
+            <button disabled class="inline-flex items-center gap-2 bg-gray-200 text-gray-500 px-8 py-3 rounded-lg font-bold cursor-not-allowed">
+                <span>Événement terminé</span>
+            </button>
+            {% elif completed_count >= 5 %}
+            <div class="inline-flex items-center gap-2 bg-green-500 text-white px-8 py-3 rounded-lg font-bold">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Tous les quiz complétés !</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Historique des quiz -->
+    {% if user_participations %}
+    <div class="bg-white rounded-xl shadow-md mb-8 overflow-hidden">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <svg class="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>Vos résultats</span>
+            </h2>
+        </div>
+        <div class="p-6">
+            <div class="grid gap-4">
+                {% for participation in user_participations %}
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                            {{ loop.index }}
+                        </div>
+                        <div>
+                            <div class="font-semibold text-gray-900">Quiz {{ loop.index }}</div>
+                            <div class="text-sm text-gray-500">
+                                {{ participation.completed_at.strftime('%d/%m/%Y à %H:%M') }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-blue-600">{{ participation.correct_count }} / {{ participation.total_questions }}</div>
+                        </div>
+                        <a href="{{ url_for('events.quiz_result', event_id=event.id, participation_id=participation.id) }}"
+                           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm">
+                            Voir détails
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Classement général -->
+    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+            <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                </svg>
+                <span>Classement général</span>
+            </h2>
+        </div>
+
+        {% if ranking %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rang</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Membre</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Quiz</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Score total</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for item in ranking %}
+                    <tr class="{% if item.is_current_user %}bg-blue-50{% else %}hover:bg-gray-50{% endif %} transition-colors {% if item.rank <= 3 %}border-l-4 {% if item.rank == 1 %}border-yellow-400{% elif item.rank == 2 %}border-gray-400{% else %}border-orange-400{% endif %}{% endif %}">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if item.rank == 1 %}
+                            <span class="text-2xl font-bold text-yellow-500">1er</span>
+                            {% elif item.rank == 2 %}
+                            <span class="text-2xl font-bold text-gray-500">2e</span>
+                            {% elif item.rank == 3 %}
+                            <span class="text-2xl font-bold text-orange-500">3e</span>
+                            {% else %}
+                            <span class="text-xl font-semibold text-gray-600">{{ item.rank }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-semibold text-gray-900">{{ item.user.username }}</span>
+                                {% if item.is_current_user %}
+                                <span class="px-2 py-1 bg-blue-600 text-white text-xs rounded-full font-bold">Vous</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="inline-flex items-center gap-2">
+                                <span class="font-semibold text-gray-900">{{ item.quiz_count }}</span>
+                                <span class="text-gray-500">/ 5</span>
+                            </div>
+                            <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden mt-1 mx-auto">
+                                <div class="h-full bg-blue-600 rounded-full" style="width: {{ (item.quiz_count / 5 * 100) | round }}%"></div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-lg font-bold text-blue-600">{{ item.total_correct }} / {{ item.total_questions }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            <div class="mb-4 flex justify-center">
+                <svg class="w-16 h-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">Aucune participation</h3>
+            <p class="text-gray-600">Soyez le premier à participer !</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_owner %}
+<script>
+function confirmDeleteEvent() {
+    if (confirm('Supprimer cet événement ?\n\nToutes les participations et scores seront supprimés. Cette action est irréversible.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("events.delete_event", event_id=event.id) }}';
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrf_token';
+        csrf.value = document.querySelector('meta[name="csrf-token"]').content;
+        form.appendChild(csrf);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endif %}
+{% endblock %}
