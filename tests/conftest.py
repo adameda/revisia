@@ -21,6 +21,9 @@ def test_app():
     """Crée une instance Flask et initialise la base SQLite en mémoire."""
     app = Flask(__name__)
     app.config["DATABASE_URL"] = "sqlite:///:memory:"
+    # Désactiver CSRF dans les tests (on teste la logique métier, pas la sécurité CSRF)
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["TESTING"] = True
     init_db(app)
 
     # Enregistre les blueprints une seule fois
@@ -48,10 +51,15 @@ def db_session():
 
 # --- Nettoyage automatique de la base avant chaque test ---
 @pytest.fixture(autouse=True)
-def clean_db():
-    """Vide toutes les tables avant chaque test pour éviter les interférences."""
+def clean_db(request):
+    """Vide toutes les tables avant chaque test pour éviter les interférences.
+    Ignoré pour les tests marqués 'no_db'."""
+    if "no_db" in request.keywords:
+        yield
+        return
     session = SessionLocal()
     for table in reversed(Base.metadata.sorted_tables):
         session.execute(table.delete())
     session.commit()
     session.close()
+    yield

@@ -3,22 +3,28 @@
 import os
 import json
 import random
-from typing import List
+import logging
+from typing import List, Tuple, Optional
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from google import genai
-from google.genai import types 
+from google.genai import types
 
 # Charger les variables d'environnement
 load_dotenv()
-
-# Initialiser le client Gemini
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 MODEL_NAME = "gemini-2.5-flash"
 
 # Mode mock pour le développement
 MOCK_MODE = os.getenv("MOCK_GEMINI", "False").lower() == "true"
+
+# Clés API avec fallback
+API_KEYS = [k for k in [
+    os.getenv("GEMINI_API_KEY"),
+    os.getenv("GEMINI_API_KEY_2"),
+] if k]
+
+logger = logging.getLogger("app.llm")
 
 
 # --- Modèle de sortie attendu ---
@@ -59,12 +65,13 @@ COURS À ANALYSER :
 """
 
 
-def generate_mock_quiz(text: str, total_questions: int = 20) -> List[dict]:
+def generate_mock_quiz(text: str, total_questions: int) -> List[dict]:
     """
     Génère un quiz mocké pour le développement.
     Évite les appels API coûteux pendant les tests.
     """
     print(f"🧪 MODE MOCK ACTIVÉ - Génération de {total_questions} questions fictives")
+    logger.info(f"Mode mock : génération de {total_questions} questions fictives")
     
     # Extraire quelques mots clés du texte pour rendre les questions plus réalistes
     words = text.split()[:50]  # Premiers 50 mots
@@ -105,36 +112,55 @@ def generate_mock_quiz(text: str, total_questions: int = 20) -> List[dict]:
     return questions
 
 
-def generate_quiz_from_text(text: str, total_questions: int = 20):
+def generate_quiz_from_text(text: str, total_questions: int) -> Tuple[List[dict], Optional[str]]:
     """
     Appelle le modèle Gemini pour générer un quiz structuré.
     En mode MOCK, génère des questions fictives.
-    Retourne une liste de dictionnaires (items).
+    Retourne (questions, error) : questions est une liste, error est None ou un code d'erreur.
+    Codes d'erreur : "quota_exceeded", "error"
     """
     # Mode mock activé
     if MOCK_MODE:
-        return generate_mock_quiz(text, total_questions)
-    
-    # Mode production - Appel réel à Gemini
-    print(f"🤖 Appel API Gemini - Génération de {total_questions} questions réelles")
+        return generate_mock_quiz(text, total_questions = 100), None
+
+    # Mode production - Appel réel à Gemini avec fallback multi-clés
+    logger.info(f"Appel API Gemini : {total_questions} questions demandées")
     prompt = PROMPT_TEMPLATE.format(texte=text, nb_questions=total_questions)
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=0.3,
-            response_mime_type="application/json",
-            response_json_schema=QuizResponse.model_json_schema()
-        )
-    )
+    last_error = None
+    for i, api_key in enumerate(API_KEYS):
+        try:
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.3,
+                    response_mime_type="application/json",
+                    response_json_schema=QuizResponse.model_json_schema()
+                )
+            )
 
-    try:
-        # Validation Pydantic automatique
-        quiz = QuizResponse.model_validate_json(response.text)
-        return [item.dict() for item in quiz.items]
+            quiz = QuizResponse.model_validate_json(response.text)
+            if i > 0:
+                logger.info(f"Fallback clé {i + 1} a fonctionné")
+            return [item.model_dump() for item in quiz.items], None
 
-    except Exception as e:
-        print("❌ Erreur de parsing JSON :", e)
-        print("Réponse brute :", response.text[:300])
-        return []
+        except Exception as e:
+            error_str = str(e).lower()
+            is_quota = "resource" in error_str and "exhausted" in error_str or "429" in error_str
+            last_error = e
+            key_label = f"clé {i + 1}"
+
+            if is_quota and i < len(API_KEYS) - 1:
+                logger.warning(f"Quota dépassé ({key_label}), bascule sur la clé suivante")
+                continue
+            elif is_quota:
+                logger.error(f"Quota dépassé sur toutes les clés")
+                return [], "quota_exceeded"
+            else:
+                logger.error(f"Erreur API ({key_label}) : {e}")
+                return [], "error"
+
+    logger.error(f"Aucune clé API disponible")
+    return [], "error"

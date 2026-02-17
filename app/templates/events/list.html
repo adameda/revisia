@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Événements - {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- En-tête -->
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+        <div>
+            <a href="{{ url_for('groups.view_group', group_id=group.id) }}"
+               class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition font-semibold mb-2">
+              <span>←</span> <span>Retour au groupe</span>
+            </a>
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                <svg class="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>Événements & Compétitions</span>
+            </h1>
+            <p class="text-gray-600">Groupe : {{ group.name }}</p>
+        </div>
+        {% if is_owner %}
+        <a href="{{ url_for('events.create_event', group_id=group.id) }}" 
+           class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <span>Créer un événement</span>
+        </a>
+        {% endif %}
+    </div>
+
+    {% if events %}
+        <div class="grid gap-6">
+            {% for event in events %}
+            <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-6 border-l-4 {% if event.status_label == 'En cours' %}border-blue-500{% elif event.status_label == 'À venir' %}border-gray-400{% else %}border-green-500{% endif %}">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                            <h3 class="text-2xl font-bold text-gray-900">{{ event.name }}</h3>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold {{ event.status_class }}">
+                                {{ event.status_label }}
+                            </span>
+                        </div>
+                        {% if event.description %}
+                        <p class="text-gray-600 mb-3">{{ event.description }}</p>
+                        {% endif %}
+                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-sm text-gray-500">
+                            <div class="flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                                <span class="font-medium">{{ event.subject.name }}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span class="text-xs">{{ event.start_date.strftime('%d/%m %H:%M') }} → {{ event.end_date.strftime('%d/%m %H:%M') }}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span>{{ event.participants_count }} participant{{ 's' if event.participants_count > 1 else '' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progression personnelle -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-semibold text-gray-700">Votre progression</span>
+                        <span class="text-sm font-bold text-blue-600">{{ event.user_progress }} / {{ event.total_quizzes }} quiz</span>
+                    </div>
+                    <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500" 
+                             style="width: {{ (event.user_progress / event.total_quizzes * 100) | round }}%"></div>
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        {% for i in range(1, 6) %}
+                        <div class="flex-1 text-center">
+                            <div class="w-full h-10 rounded-lg flex items-center justify-center font-bold text-sm
+                                        {% if i <= event.user_progress %}bg-green-500 text-white
+                                        {% elif i == event.next_quiz and event.can_play %}bg-blue-500 text-white ring-2 ring-blue-300
+                                        {% else %}bg-gray-200 text-gray-400{% endif %}">
+                                {% if i <= event.user_progress %}
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                                </svg>
+                                {% else %}{{ i }}{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-4 border-t border-gray-200">
+                    <div class="text-sm text-gray-600">
+                        {% if event.user_progress == event.total_quizzes %}
+                        <span class="flex items-center gap-1.5 text-green-600 font-semibold">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Événement complété !</span>
+                        </span>
+                        {% elif event.can_play and event.next_quiz %}
+                        <span class="flex items-center gap-1.5 text-blue-600 font-semibold">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span>Quiz {{ event.next_quiz }} disponible</span>
+                        </span>
+                        {% elif event.status_label == 'À venir' %}
+                        <span class="text-gray-500">L'événement n'a pas encore commencé</span>
+                        {% else %}
+                        <span class="text-gray-500">Événement terminé</span>
+                        {% endif %}
+                    </div>
+                <div class="flex flex-wrap gap-2">
+                        {% if event.can_play and event.next_quiz %}
+                        <a href="{{ url_for('events.play_quiz', event_id=event.id, quiz_number=event.next_quiz) }}" 
+                           class="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg font-semibold flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Quiz {{ event.next_quiz }}</span>
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('events.event_detail', event_id=event.id) }}" 
+                           class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-semibold flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span>Classement</span>
+                        </a>
+                        {% if is_owner %}
+                        <button onclick="deleteEvent('{{ event.id }}', '{{ event.name }}')"
+                                class="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors font-semibold">
+                            Supprimer
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white rounded-xl shadow-md p-12 text-center">
+            <div class="mb-4">
+                <svg class="w-24 h-24 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">Aucun événement</h3>
+            {% if is_owner %}
+            <p class="text-gray-600 mb-6">Créez votre premier événement pour organiser une compétition !</p>
+            <a href="{{ url_for('events.create_event', group_id=group.id) }}" 
+               class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span>Créer mon premier événement</span>
+            </a>
+            {% else %}
+            <p class="text-gray-600">Il n'y a pas d'événements dans ce groupe pour le moment.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function deleteEvent(eventId, eventName) {
+    const message = `Supprimer l'événement "${eventName}" ?\n\nCette action va supprimer :\n• L'événement et ses 5 quiz\n• Toutes les participations\n• L'historique des scores\n\nCette action est irréversible.`;
+    if (confirm(message)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/events/${eventId}/delete`;
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrf_token';
+        csrf.value = document.querySelector('meta[name="csrf-token"]').content;
+        form.appendChild(csrf);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

@@ -2,7 +2,7 @@ import uuid
 import enum
 import random
 import string
-from sqlalchemy import Column, Text, Boolean, DateTime, ForeignKey, Enum, JSON, Float, Integer
+from sqlalchemy import Boolean, Column, Text, DateTime, ForeignKey, Enum as SAEnum, JSON, Integer, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,9 +10,18 @@ from flask_login import UserMixin
 from .db import Base
 
 # --- Enum pour le type de question ---
+
+# --- Enum pour le type de question (PostgreSQL) ---
 class QuestionType(str, enum.Enum):
     qcm = "qcm"
     ouverte = "ouverte"
+
+# Déclaration explicite de l'ENUM SQLAlchemy pour PostgreSQL
+question_type_enum = SAEnum(
+    QuestionType,
+    name="questiontype",
+    create_type=False  # On gère la création manuellement
+)
 
 
 # --- Helper pour générer un code d'invitation unique ---
@@ -31,13 +40,12 @@ class User(Base, UserMixin):
     username = Column(Text, unique=True, nullable=False)
     email = Column(Text, unique=True, nullable=False)
     password_hash = Column(Text, nullable=False)
-    is_teacher = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
     documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
     quiz_sessions = relationship("QuizSession", back_populates="user", cascade="all, delete-orphan")
     subjects = relationship("Subject", back_populates="user", cascade="all, delete-orphan")
-    created_groups = relationship("Group", back_populates="teacher", cascade="all, delete-orphan", foreign_keys="Group.teacher_id")
+    owned_groups = relationship("Group", back_populates="owner", cascade="all, delete-orphan", foreign_keys="Group.owner_id")
     group_memberships = relationship("GroupMember", back_populates="user", cascade="all, delete-orphan")
 
     def set_password(self, password: str):
@@ -78,6 +86,11 @@ class Document(Base):
     subject = relationship("Subject", back_populates="documents")
 
     questions = relationship("Question", back_populates="document", cascade="all, delete-orphan")
+    quiz_sessions = relationship(
+        "QuizSession",
+        back_populates="document",
+        cascade="all, delete-orphan"
+    )
 
 
 # --- Table questions ---
@@ -86,7 +99,7 @@ class Question(Base):
 
     id: Mapped[str] = mapped_column(Text, primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id = Column(Text, ForeignKey("documents.id"), nullable=False)
-    type = Column(Enum(QuestionType), nullable=False)
+    type = Column(question_type_enum, nullable=False)
     question = Column(Text, nullable=False)
     choices = Column(JSON, nullable=True)
     answer = Column(Text, nullable=True)
@@ -113,20 +126,31 @@ class Result(Base):
     quiz_session = relationship("QuizSession", back_populates="results")
 
 
+# --- Table quiz_generations (compteur de générations par user/jour) ---
+class QuizGeneration(Base):
+    __tablename__ = "quiz_generations"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(Text, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User")
+
+
 # --- Table quiz_sessions ---
 class QuizSession(Base):
     __tablename__ = "quiz_sessions"
 
     id: Mapped[str] = mapped_column(Text, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(Text, ForeignKey("users.id"), nullable=False)
-    document_id = Column(Text, ForeignKey("documents.id"), nullable=False)
+    document_id = Column(Text, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     score = Column(Float, nullable=False)
     total_questions = Column(Integer, nullable=False)
     played_at = Column(DateTime, server_default=func.now())
 
     # Relations
     user = relationship("User", back_populates="quiz_sessions")
-    document = relationship("Document")
+    document = relationship("Document", back_populates="quiz_sessions", passive_deletes=True)
     results = relationship("Result", back_populates="quiz_session", cascade="all, delete-orphan")
 
 
@@ -138,10 +162,10 @@ class Group(Base):
     name = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
     invite_code = Column(Text, unique=True, nullable=False)
-    teacher_id = Column(Text, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(Text, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
-    teacher = relationship("User", back_populates="created_groups", foreign_keys=[teacher_id])
+    owner = relationship("User", back_populates="owned_groups", foreign_keys=[owner_id])
     members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
     subjects = relationship("GroupSubject", back_populates="group", cascade="all, delete-orphan")
 
@@ -230,7 +254,7 @@ class EventParticipation(Base):
     event_id = Column(Text, ForeignKey("events.id"), nullable=False)
     quiz_id = Column(Text, ForeignKey("event_quizzes.id"), nullable=False)
     user_id = Column(Text, ForeignKey("users.id"), nullable=False)
-    score = Column(Float, nullable=False)
+    correct_count = Column(Integer, nullable=False, default=0)
     total_questions = Column(Integer, nullable=False)
     time_spent = Column(Integer, nullable=True)  # en secondes
     answers = Column(JSON, nullable=False)  # Détails des réponses

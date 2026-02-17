@@ -32,14 +32,14 @@
         Voir mes documents
       </a>
     {% else %}
-      <div class="space-x-3">
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
         <a href="{{ url_for('auth.register') }}"
           class="inline-block bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
-          ✍️ Créer un compte
+          Créer un compte
         </a>
         <a href="{{ url_for('auth.login') }}"
           class="inline-block border border-blue-500 text-blue-600 px-6 py-2.5 rounded-lg shadow hover:bg-blue-50 transition transform hover:-translate-y-0.5">
-          🔑 Se connecter
+          Se connecter
         </a>
       </div>
     {% endif %}
@@ -47,7 +47,11 @@
 </div>
 
 <!-- SECTION CONCEPT : les 3 cartes -->
-<section class="relative z-10 container mx-auto mt-24 mb-16 px-6 grid gap-8 md:grid-cols-3 text-center">
+<section class="relative z-10 container mx-auto mt-24 mb-16 px-6">
+  <h2 class="text-2xl md:text-3xl font-bold text-center mb-10 bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+    Révisez intelligemment
+  </h2>
+  <div class="grid gap-8 md:grid-cols-3 text-center">
   <!-- Carte 1 -->
   <div class="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition transform hover:-translate-y-1">
     <div class="flex justify-center mb-4">
@@ -79,6 +83,48 @@
     </div>
     <h3 class="text-xl font-semibold mb-2 text-gray-800">3. Suis ta progression</h3>
     <p class="text-gray-600">Analyse ton évolution grâce à des graphiques clairs et mesure tes progrès sur chaque cours.</p>
+  </div>
+  </div>
+</section>
+
+<!-- SECTION COLLABORATIF -->
+<section class="relative z-10 container mx-auto mb-20 px-6">
+  <h2 class="text-2xl md:text-3xl font-bold text-center mb-10 bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
+    Révisez ensemble
+  </h2>
+  <div class="grid gap-8 md:grid-cols-3 text-center">
+    <!-- Carte Groupe -->
+    <div class="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition transform hover:-translate-y-1">
+      <div class="flex justify-center mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+        </svg>
+      </div>
+      <h3 class="text-xl font-semibold mb-2 text-gray-800">Créez un groupe</h3>
+      <p class="text-gray-600">Rassemblez vos camarades dans un groupe privé grâce à un code d'invitation. Partagez vos cours et révisez ensemble.</p>
+    </div>
+
+    <!-- Carte Événement -->
+    <div class="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition transform hover:-translate-y-1">
+      <div class="flex justify-center mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0 1 16.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.023 6.023 0 0 1-2.27.308 6.023 6.023 0 0 1-2.27-.308" />
+        </svg>
+      </div>
+      <h3 class="text-xl font-semibold mb-2 text-gray-800">Lancez des événements</h3>
+      <p class="text-gray-600">Créez un quiz partagé sur un cours du groupe. Chaque membre peut y participer et tester ses connaissances.</p>
+    </div>
+
+    <!-- Carte Classement -->
+    <div class="bg-white rounded-2xl shadow-md p-6 hover:shadow-lg transition transform hover:-translate-y-1">
+      <div class="flex justify-center mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+        </svg>
+      </div>
+      <h3 class="text-xl font-semibold mb-2 text-gray-800">Comparez vos scores</h3>
+      <p class="text-gray-600">Consultez le classement de chaque événement et mesurez-vous à vos amis pour vous motiver mutuellement.</p>
+    </div>
   </div>
 </section>
 

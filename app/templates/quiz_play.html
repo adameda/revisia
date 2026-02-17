@@ -4,10 +4,10 @@
 <div id="quizContainer"
      data-questions='{{ questions | tojson }}'
      data-document-id="{{ document.id }}"
-     class="max-w-2xl mx-auto bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-8 text-center border border-gray-100 animate-fade-in">
+     class="max-w-2xl mx-auto bg-white/80 backdrop-blur-md rounded-2xl shadow-lg px-4 py-6 sm:p-8 text-center border border-gray-100 animate-fade-in">
 
   <!-- Titre -->
-  <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent mb-2">
+  <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent mb-2">
     {{ title }}
   </h1>
 
@@ -22,7 +22,7 @@
 
   <!-- Bouton suivant -->
   <button id="nextBtn"
-          class="hidden mt-8 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium px-8 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5">
+          class="hidden mt-6 sm:mt-8 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium px-6 sm:px-8 py-2.5 rounded-lg shadow hover:opacity-90 transition transform hover:-translate-y-0.5 w-full sm:w-auto">
     Suivant →
   </button>
 

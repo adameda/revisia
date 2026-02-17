@@ -1,649 +1,500 @@
 """
-Routes pour la gestion des événements/compétitions
-Permet aux professeurs de créer des événements et aux étudiants d'y participer
+Routes pour la gestion des événements/compétitions.
+Tout membre d'un groupe peut participer. Seul le propriétaire du groupe peut créer/supprimer.
 """
 
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from sqlalchemy import and_, or_
-from datetime import datetime, timedelta
+from sqlalchemy import and_, func
+from datetime import datetime
 import random
 import json
 
 from ..db import SessionLocal
-from ..models import Event, EventQuiz, EventParticipation, Group, GroupMember, Subject, Question, GroupSubject
+from ..models import (
+    Event, EventQuiz, EventParticipation,
+    Group, GroupMember, Subject, Question, GroupSubject, User,
+)
 
-# Blueprint pour les professeurs
-teacher_events_bp = Blueprint('teacher_events', __name__, url_prefix='/teacher/events')
-
-# Blueprint pour les étudiants
-student_events_bp = Blueprint('student_events', __name__, url_prefix='/events')
+events_bp = Blueprint("events", __name__, url_prefix="/events")
+logger = logging.getLogger("app.events")
 
 
-# ========== ROUTES PROFESSEUR ==========
+# ============================================
+# HELPERS
+# ============================================
 
-@teacher_events_bp.route('/group/<group_id>')
+def _check_group_membership(session, group_id, user_id):
+    """Vérifie l'appartenance au groupe. Retourne (group, is_owner, is_member)."""
+    group = session.get(Group, group_id)
+    if not group:
+        return None, False, False
+    is_owner = group.owner_id == user_id
+    is_member = is_owner or session.query(GroupMember).filter_by(
+        group_id=group_id, user_id=user_id
+    ).first() is not None
+    return group, is_owner, is_member
+
+
+def _enrich_event_for_user(session, event, user_id):
+    """Ajoute des attributs de progression et de statut à un événement."""
+    status = event.get_status()
+    if status == 'future':
+        event.status_label = "À venir"
+        event.status_class = "bg-blue-100 text-blue-800"
+        event.can_play = False
+    elif status == 'ended':
+        event.status_label = "Terminé"
+        event.status_class = "bg-gray-100 text-gray-800"
+        event.can_play = False
+    else:
+        event.status_label = "En cours"
+        event.status_class = "bg-green-100 text-green-800"
+        event.can_play = True
+
+    event.participants_count = (
+        session.query(EventParticipation.user_id)
+        .filter(EventParticipation.event_id == event.id)
+        .distinct().count()
+    )
+
+    completed = session.query(EventParticipation).filter(
+        EventParticipation.event_id == event.id,
+        EventParticipation.user_id == user_id,
+    ).count()
+    event.user_progress = completed
+    event.total_quizzes = 5
+    event.next_quiz = completed + 1 if completed < 5 else None
+
+
+# ============================================
+# ROUTES
+# ============================================
+
+@events_bp.route("/group/<group_id>")
 @login_required
 def group_events(group_id):
-    """Liste des événements d'un groupe (vue professeur)"""
-    if not current_user.is_teacher:
-        flash("Accès refusé. Vous devez être professeur.", "error")
-        return redirect(url_for('ui.home'))
-    
+    """Liste des événements d'un groupe."""
     session = SessionLocal()
     try:
-        group = session.get(Group, group_id)
-        if not group or group.teacher_id != current_user.id:
-            flash("Groupe introuvable ou accès non autorisé.", "error")
-            return redirect(url_for('teacher.list_groups'))
-        
-        # Récupérer tous les événements du groupe
-        events = session.query(Event).filter(
-            Event.group_id == group_id
-        ).order_by(Event.start_date.desc()).all()
-        
-        # Enrichir avec des stats
+        group, is_owner, is_member = _check_group_membership(session, group_id, current_user.id)
+        if not group or not is_member:
+            flash("Accès non autorisé.", "error")
+            return redirect(url_for("groups.list_groups"))
+
+        events = (
+            session.query(Event)
+            .filter(Event.group_id == group_id)
+            .order_by(Event.start_date.desc())
+            .all()
+        )
         for event in events:
-            # Nombre de participants uniques
-            event.participants_count = session.query(EventParticipation.user_id).filter(
-                EventParticipation.event_id == event.id
-            ).distinct().count()
-            
-            # ⚠️ Statut de l'événement (clôture automatique)
-            status = event.get_status()
-            if status == 'future':
-                event.status = "À venir"
-                event.status_class = "bg-blue-100 text-blue-800"
-            elif status == 'ended':
-                event.status = "Terminé"
-                event.status_class = "bg-gray-100 text-gray-800"
-            else:  # active
-                event.status = "En cours"
-                event.status_class = "bg-green-100 text-green-800"
-        
-        return render_template('teacher/events.html', group=group, events=events)
+            _enrich_event_for_user(session, event, current_user.id)
+
+        return render_template("events/list.html", group=group, events=events, is_owner=is_owner)
     finally:
         session.close()
 
 
-@teacher_events_bp.route('/create/<group_id>', methods=['GET', 'POST'])
+@events_bp.route("/create/<group_id>", methods=["GET", "POST"])
 @login_required
 def create_event(group_id):
-    """Créer un événement pour un groupe"""
-    if not current_user.is_teacher:
-        flash("Accès refusé. Vous devez être professeur.", "error")
-        return redirect(url_for('ui.home'))
-    
+    """Créer un événement (propriétaire du groupe uniquement)."""
     session = SessionLocal()
     try:
-        group = session.get(Group, group_id)
-        if not group or group.teacher_id != current_user.id:
-            flash("Groupe introuvable ou accès non autorisé.", "error")
-            return redirect(url_for('teacher.list_groups'))
-        
-        # Récupérer les matières liées au groupe
-        group_subjects = session.query(Subject).join(
-            GroupSubject, Subject.id == GroupSubject.subject_id
-        ).filter(GroupSubject.group_id == group_id).all()
-        
-        if request.method == 'POST':
-            name = request.form.get('name')
-            description = request.form.get('description')
-            subject_id = request.form.get('subject_id')
-            start_date_str = request.form.get('start_date')
-            end_date_str = request.form.get('end_date')
-            
-            # Validation
+        group, is_owner, _ = _check_group_membership(session, group_id, current_user.id)
+        if not group or not is_owner:
+            flash("Accès non autorisé.", "error")
+            return redirect(url_for("groups.list_groups"))
+
+        group_subjects = (
+            session.query(Subject)
+            .join(GroupSubject, Subject.id == GroupSubject.subject_id)
+            .filter(GroupSubject.group_id == group_id)
+            .all()
+        )
+
+        if request.method == "POST":
+            name = request.form.get("name")
+            description = request.form.get("description")
+            subject_id = request.form.get("subject_id")
+            start_date_str = request.form.get("start_date")
+            end_date_str = request.form.get("end_date")
+
             if not all([name, subject_id, start_date_str, end_date_str]):
                 flash("Tous les champs obligatoires doivent être remplis.", "error")
                 return redirect(request.url)
-            
-            # Vérifier que la matière est bien liée au groupe
-            subject_in_group = session.query(GroupSubject).filter(
+
+            if not session.query(GroupSubject).filter(
                 and_(GroupSubject.group_id == group_id, GroupSubject.subject_id == subject_id)
-            ).first()
-            
-            if not subject_in_group:
+            ).first():
                 flash("La matière sélectionnée n'est pas liée à ce groupe.", "error")
                 return redirect(request.url)
-            
+
             try:
                 start_date = datetime.fromisoformat(start_date_str)
                 end_date = datetime.fromisoformat(end_date_str)
-                
                 if end_date <= start_date:
                     flash("La date de fin doit être après la date de début.", "error")
                     return redirect(request.url)
-                
             except ValueError:
                 flash("Format de date invalide.", "error")
                 return redirect(request.url)
-            
-            # Récupérer toutes les questions de la matière
-            questions = session.query(Question).join(
-                Question.document
-            ).filter(Question.document.has(subject_id=subject_id)).all()
-            
-            # ⚠️ VALIDATION CRITIQUE : Vérifier le nombre de questions
-            required_questions = 100  # 5 quiz x 20 questions
-            if len(questions) < required_questions:
-                flash(f"❌ Impossible de créer l'événement : la matière ne contient que {len(questions)} question(s), mais {required_questions} sont nécessaires (5 quiz × 20 questions).", "error")
-                return render_template('teacher/event_create.html', group=group, subjects=group_subjects)
-            
-            # Créer l'événement
+
+            questions = (
+                session.query(Question)
+                .join(Question.document)
+                .filter(Question.document.has(subject_id=subject_id))
+                .all()
+            )
+
+            required = 100  # 5 quiz × 20 questions
+            if len(questions) < required:
+                flash(
+                    f"❌ La matière ne contient que {len(questions)} question(s), "
+                    f"mais {required} sont nécessaires (5 quiz × 20 questions).",
+                    "error",
+                )
+                return render_template("events/create.html", group=group, subjects=group_subjects)
+
             event = Event(
                 name=name,
                 description=description,
                 group_id=group_id,
                 subject_id=subject_id,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
             )
             session.add(event)
-            session.flush()  # Pour obtenir l'ID de l'événement
-            
-            # Générer les 5 quiz avec 20 questions aléatoires chacun
-            all_question_ids = [q.id for q in questions]
-            random.shuffle(all_question_ids)
-            
-            for i in range(1, 6):  # Quiz 1 à 5
-                start_idx = (i - 1) * 20
-                end_idx = start_idx + 20
-                quiz_questions = all_question_ids[start_idx:end_idx]
-                
+            session.flush()
+
+            all_ids = [q.id for q in questions]
+            random.shuffle(all_ids)
+
+            for i in range(1, 6):
                 quiz = EventQuiz(
                     event_id=event.id,
                     quiz_number=i,
-                    questions=json.dumps(quiz_questions)
+                    questions=json.dumps(all_ids[(i - 1) * 20 : i * 20]),
                 )
                 session.add(quiz)
-            
+
             session.commit()
-            flash(f"Événement '{name}' créé avec succès !", "success")
-            return redirect(url_for('teacher_events.group_events', group_id=group_id))
-        
-        return render_template('teacher/event_create.html', group=group, subjects=group_subjects)
+            logger.info(f"Événement créé : '{name}' dans groupe '{group.name}' par {current_user.username}")
+            flash(f"Événement '{name}' créé !", "success")
+            return redirect(url_for("events.group_events", group_id=group_id))
+
+        return render_template("events/create.html", group=group, subjects=group_subjects)
     finally:
         session.close()
 
 
-@teacher_events_bp.route('/<event_id>')
+@events_bp.route("/<event_id>")
 @login_required
 def event_detail(event_id):
-    """Détails d'un événement avec classement et statistiques"""
-    if not current_user.is_teacher:
-        flash("Accès refusé. Vous devez être professeur.", "error")
-        return redirect(url_for('ui.home'))
-    
+    """Détails d'un événement : classement + progression personnelle."""
     session = SessionLocal()
     try:
-        from sqlalchemy import func
-        event = session.get(Event, event_id)
-        if not event or event.group.teacher_id != current_user.id:
-            flash("Événement introuvable ou accès non autorisé.", "error")
-            return redirect(url_for('teacher.list_groups'))
-        
-        # Calculer le classement
-        # Pour chaque étudiant : score total, nombre de quiz complétés
-        ranking_data = session.query(
-            EventParticipation.user_id,
-            func.sum(EventParticipation.score).label('total_score'),
-            func.count(EventParticipation.id).label('quiz_count')
-        ).filter(
-            EventParticipation.event_id == event_id
-        ).group_by(EventParticipation.user_id).all()
-        
-        # Enrichir avec les infos utilisateur
-        from ..models import User
-        ranking = []
-        for user_id, total_score, quiz_count in ranking_data:
-            user = session.get(User, user_id)
-            ranking.append({
-                'user': user,
-                'total_score': total_score,
-                'quiz_count': quiz_count,
-                'avg_score': round(total_score / quiz_count, 1) if quiz_count > 0 else 0
-            })
-        
-        # Trier par score total décroissant
-        ranking.sort(key=lambda x: x['total_score'], reverse=True)
-        
-        # Ajouter le rang
-        for idx, item in enumerate(ranking, 1):
-            item['rank'] = idx
-        
-        # Statistiques globales
-        total_participants = len(ranking)
-        total_completions = sum(r['quiz_count'] for r in ranking)
-        avg_score = round(sum(r['total_score'] for r in ranking) / total_participants, 1) if total_participants > 0 else 0
-        
-        stats = {
-            'total_participants': total_participants,
-            'total_completions': total_completions,
-            'avg_score': avg_score,
-            'total_quizzes': 5
-        }
-        
-        return render_template('teacher/event_detail.html', event=event, ranking=ranking, stats=stats)
-    finally:
-        session.close()
-
-
-@teacher_events_bp.route('/<event_id>/delete', methods=['POST'])
-@login_required
-def delete_event(event_id):
-    """Supprimer un événement"""
-    if not current_user.is_teacher:
-        return jsonify({'error': 'Accès refusé'}), 403
-    
-    session = SessionLocal()
-    try:
-        event = session.get(Event, event_id)
-        if not event or event.group.teacher_id != current_user.id:
-            return jsonify({'error': 'Événement introuvable'}), 404
-        
-        # ⚠️ Vérifier s'il y a des participations
-        participation_count = session.query(EventParticipation).filter_by(event_id=event_id).count()
-        
-        if participation_count > 0:
-            # Il y a des participations, on avertit mais on permet la suppression
-            flash(f"⚠️ Attention : {participation_count} participation(s) seront supprimées avec cet événement.", "warning")
-        
-        group_id = event.group_id
-        event_name = event.name
-        
-        # La cascade DELETE se chargera de supprimer les quiz et participations
-        session.delete(event)
-        session.commit()
-        
-        flash(f"✅ Événement '{event_name}' supprimé avec succès.", "success")
-        return redirect(url_for('teacher_events.group_events', group_id=group_id))
-    except Exception as e:
-        session.rollback()
-        flash(f"❌ Erreur lors de la suppression : {str(e)}", "error")
-        return redirect(url_for('teacher_events.group_events', group_id=event.group_id if event else ''))
-    finally:
-        session.close()
-
-
-# ========== ROUTES ÉTUDIANT ==========
-
-@student_events_bp.route('/group/<group_id>')
-@login_required
-def group_events(group_id):
-    """Liste des événements d'un groupe (vue étudiant)"""
-    session = SessionLocal()
-    try:
-        # Vérifier que l'étudiant est membre du groupe
-        membership = session.query(GroupMember).filter(
-            and_(GroupMember.group_id == group_id, GroupMember.user_id == current_user.id)
-        ).first()
-        
-        if not membership:
-            flash("Vous n'êtes pas membre de ce groupe.", "error")
-            return redirect(url_for('groups.list_groups'))
-        
-        group = session.get(Group, group_id)
-        
-        # Récupérer les événements actifs ou à venir
-        now = datetime.now()
-        events = session.query(Event).filter(
-            and_(Event.group_id == group_id, Event.end_date >= now)
-        ).order_by(Event.start_date).all()
-        
-        # Pour chaque événement, calculer la progression de l'utilisateur
-        for event in events:
-            # Nombre de quiz complétés par l'utilisateur
-            completed_quizzes = session.query(EventParticipation).filter(
-                and_(
-                    EventParticipation.event_id == event.id,
-                    EventParticipation.user_id == current_user.id
-                )
-            ).count()
-            
-            event.user_progress = completed_quizzes
-            event.total_quizzes = 5
-            event.next_quiz = completed_quizzes + 1 if completed_quizzes < 5 else None
-            
-            # Statut
-            if now < event.start_date:
-                event.status = "À venir"
-                event.status_class = "bg-blue-100 text-blue-800"
-                event.can_play = False
-            elif now > event.end_date:
-                event.status = "Terminé"
-                event.status_class = "bg-gray-100 text-gray-800"
-                event.can_play = False
-            else:
-                event.status = "En cours"
-                event.status_class = "bg-green-100 text-green-800"
-                event.can_play = True
-        
-        return render_template('student/events.html', group=group, events=events)
-    finally:
-        session.close()
-
-
-@student_events_bp.route('/<event_id>')
-@login_required
-def event_detail(event_id):
-    """Détails d'un événement avec classement et progression personnelle"""
-    session = SessionLocal()
-    try:
-        from sqlalchemy import func
         event = session.get(Event, event_id)
         if not event:
             flash("Événement introuvable.", "error")
-            return redirect(url_for('ui.home'))
-        
-        # Vérifier que l'étudiant est membre du groupe
-        membership = session.query(GroupMember).filter(
-            and_(GroupMember.group_id == event.group_id, GroupMember.user_id == current_user.id)
-        ).first()
-        
-        if not membership:
-            flash("Vous n'êtes pas membre de ce groupe.", "error")
-            return redirect(url_for('ui.home'))
-        
+            return redirect(url_for("ui.home"))
+
+        group, is_owner, is_member = _check_group_membership(session, event.group_id, current_user.id)
+        if not is_member:
+            flash("Accès non autorisé.", "error")
+            return redirect(url_for("groups.list_groups"))
+
         # Progression de l'utilisateur
-        user_participations = session.query(EventParticipation).filter(
-            and_(
-                EventParticipation.event_id == event_id,
-                EventParticipation.user_id == current_user.id
-            )
-        ).order_by(EventParticipation.completed_at).all()
-        
+        user_participations = (
+            session.query(EventParticipation)
+            .filter(EventParticipation.event_id == event_id, EventParticipation.user_id == current_user.id)
+            .order_by(EventParticipation.completed_at)
+            .all()
+        )
         completed_count = len(user_participations)
         next_quiz = completed_count + 1 if completed_count < 5 else None
-        user_total_score = sum(p.score for p in user_participations)
-        
-        # Classement général
-        ranking_data = session.query(
-            EventParticipation.user_id,
-            func.sum(EventParticipation.score).label('total_score'),
-            func.count(EventParticipation.id).label('quiz_count')
-        ).filter(
-            EventParticipation.event_id == event_id
-        ).group_by(EventParticipation.user_id).all()
-        
-        from ..models import User
+        user_correct = sum(p.correct_count for p in user_participations)
+        user_total_q = sum(p.total_questions for p in user_participations)
+
+        # Classement
+        ranking_data = (
+            session.query(
+                EventParticipation.user_id,
+                func.sum(EventParticipation.correct_count).label("total_correct"),
+                func.sum(EventParticipation.total_questions).label("total_questions"),
+                func.count(EventParticipation.id).label("quiz_count"),
+            )
+            .filter(EventParticipation.event_id == event_id)
+            .group_by(EventParticipation.user_id)
+            .all()
+        )
+
         ranking = []
-        for user_id, total_score, quiz_count in ranking_data:
+        for user_id, total_correct, total_questions, quiz_count in ranking_data:
             user = session.get(User, user_id)
             ranking.append({
-                'user': user,
-                'total_score': total_score,
-                'quiz_count': quiz_count,
-                'is_current_user': user_id == current_user.id
+                "user": user,
+                "total_correct": total_correct,
+                "total_questions": total_questions,
+                "quiz_count": quiz_count,
+                "is_current_user": user_id == current_user.id,
             })
-        
-        ranking.sort(key=lambda x: x['total_score'], reverse=True)
-        
+        ranking.sort(key=lambda x: x["total_correct"], reverse=True)
         for idx, item in enumerate(ranking, 1):
-            item['rank'] = idx
-        
-        # ⚠️ Vérifier si l'événement est actif (clôture automatique)
+            item["rank"] = idx
+
+        # Stats
+        total_participants = len(ranking)
+        all_correct = sum(r["total_correct"] for r in ranking)
+        all_questions = sum(r["total_questions"] for r in ranking)
+        stats = {
+            "total_participants": total_participants,
+            "total_completions": sum(r["quiz_count"] for r in ranking),
+            "avg_correct": round(all_correct / total_participants, 1) if total_participants else 0,
+            "avg_total": round(all_questions / total_participants, 1) if total_participants else 0,
+            "total_quizzes": 5,
+        }
+
         status = event.get_status()
-        can_play = status == 'active' and next_quiz is not None
-        
-        return render_template('student/event_detail.html', 
-                              event=event, 
-                              ranking=ranking,
-                              user_participations=user_participations,
-                              completed_count=completed_count,
-                              next_quiz=next_quiz,
-                              user_total_score=user_total_score,
-                              can_play=can_play)
+        can_play = status == "active" and next_quiz is not None
+
+        return render_template(
+            "events/detail.html",
+            event=event,
+            is_owner=is_owner,
+            ranking=ranking,
+            stats=stats,
+            user_participations=user_participations,
+            completed_count=completed_count,
+            next_quiz=next_quiz,
+            user_correct=user_correct,
+            user_total_q=user_total_q,
+            can_play=can_play,
+        )
     finally:
         session.close()
 
 
-@student_events_bp.route('/<event_id>/play/<int:quiz_number>')
+@events_bp.route("/<event_id>/delete", methods=["POST"])
 @login_required
-def play_quiz(event_id, quiz_number):
-    """Jouer un quiz d'événement"""
+def delete_event(event_id):
+    """Supprimer un événement (propriétaire du groupe uniquement)."""
     session = SessionLocal()
     try:
         event = session.get(Event, event_id)
         if not event:
             flash("Événement introuvable.", "error")
-            return redirect(url_for('ui.home'))
-        
-        # ⚠️ VÉRIFICATION 1 : Membership du groupe
-        membership = session.query(GroupMember).filter(
-            and_(GroupMember.group_id == event.group_id, GroupMember.user_id == current_user.id)
-        ).first()
-        
-        if not membership:
-            flash("❌ Vous n'êtes pas membre de ce groupe.", "error")
-            return redirect(url_for('groups.list_groups'))
-        
-        # ⚠️ VÉRIFICATION 2 : Événement actif (clôture automatique)
-        event_status = event.get_status()
-        if event_status == 'future':
-            flash("⚠️ Cet événement n'a pas encore commencé.", "warning")
-            return redirect(url_for('student_events.event_detail', event_id=event_id))
-        elif event_status == 'ended':
-            flash("❌ Cet événement est terminé.", "error")
-            return redirect(url_for('student_events.event_detail', event_id=event_id))
-        
-        # ⚠️ VÉRIFICATION 3 : Quiz existe
-        if quiz_number < 1 or quiz_number > 5:
-            flash("❌ Numéro de quiz invalide.", "error")
-            return redirect(url_for('student_events.event_detail', event_id=event_id))
-        
-        quiz = session.query(EventQuiz).filter(
-            and_(EventQuiz.event_id == event_id, EventQuiz.quiz_number == quiz_number)
-        ).first()
-        
-        if not quiz:
-            flash("Quiz introuvable.", "error")
-            return redirect(url_for('student_events.event_detail', event_id=event_id))
-        
-        # ⚠️ VÉRIFICATION 4 : Pas déjà complété
-        existing_participation = session.query(EventParticipation).filter(
-            and_(
-                EventParticipation.quiz_id == quiz.id,
-                EventParticipation.user_id == current_user.id
-            )
-        ).first()
-        
-        if existing_participation:
-            flash("⚠️ Vous avez déjà complété ce quiz.", "warning")
-            return redirect(url_for('student_events.quiz_result', event_id=event_id, participation_id=existing_participation.id))
-        
-        # ⚠️ VÉRIFICATION 5 : Déverrouillage séquentiel strict
-        completed_count = session.query(EventParticipation).filter(
-            and_(
-                EventParticipation.event_id == event_id,
-                EventParticipation.user_id == current_user.id
-            )
-        ).count()
-        
-        expected_quiz = completed_count + 1
-        if quiz_number != expected_quiz:
-            if quiz_number > expected_quiz:
-                flash(f"🔒 Vous devez d'abord compléter le Quiz {expected_quiz}.", "error")
-            else:
-                flash(f"⚠️ Vous avez déjà complété les {completed_count} premiers quiz.", "warning")
-            return redirect(url_for('student_events.event_detail', event_id=event_id))
-        
-        # Charger les questions
-        question_ids = json.loads(quiz.questions)
-        questions = session.query(Question).filter(Question.id.in_(question_ids)).all()
-        
-        # Trier les questions dans l'ordre du JSON
-        questions_dict = {q.id: q for q in questions}
-        questions_ordered = [questions_dict[qid] for qid in question_ids if qid in questions_dict]
-        
-        return render_template('student/event_play.html', 
-                              event=event, 
-                              quiz=quiz, 
-                              questions=questions_ordered)
+            return redirect(url_for("groups.list_groups"))
+
+        group, is_owner, _ = _check_group_membership(session, event.group_id, current_user.id)
+        if not is_owner:
+            flash("Accès non autorisé.", "error")
+            return redirect(url_for("groups.list_groups"))
+
+        group_id = event.group_id
+        event_name = event.name
+        session.delete(event)
+        session.commit()
+        logger.info(f"Événement supprimé : '{event_name}' par {current_user.username}")
+        flash(f"Événement '{event_name}' supprimé.", "success")
+        return redirect(url_for("events.group_events", group_id=group_id))
+    except Exception as e:
+        session.rollback()
+        flash(f"Erreur : {e}", "error")
+        return redirect(url_for("events.group_events", group_id=event.group_id if event else ""))
     finally:
         session.close()
 
 
-@student_events_bp.route('/<event_id>/submit/<int:quiz_number>', methods=['POST'])
+@events_bp.route("/<event_id>/play/<int:quiz_number>")
 @login_required
-def submit_quiz(event_id, quiz_number):
-    """Soumettre les réponses d'un quiz d'événement"""
+def play_quiz(event_id, quiz_number):
+    """Jouer un quiz d'événement."""
     session = SessionLocal()
     try:
         event = session.get(Event, event_id)
         if not event:
-            return jsonify({'error': 'Événement introuvable'}), 404
-        
-        # ⚠️ VÉRIFICATION 1 : Membership
-        membership = session.query(GroupMember).filter(
-            and_(GroupMember.group_id == event.group_id, GroupMember.user_id == current_user.id)
-        ).first()
-        
-        if not membership:
-            return jsonify({'error': 'Accès non autorisé : vous n\'\u00eates pas membre de ce groupe'}), 403
-        
-        # ⚠️ VÉRIFICATION 2 : Événement actif
-        event_status = event.get_status()
-        if event_status != 'active':
-            return jsonify({'error': 'Événement non actif ou terminé'}), 403
-        
-        # ⚠️ VÉRIFICATION 3 : Quiz valide
+            flash("Événement introuvable.", "error")
+            return redirect(url_for("ui.home"))
+
+        _, _, is_member = _check_group_membership(session, event.group_id, current_user.id)
+        if not is_member:
+            flash("❌ Vous n'êtes pas membre de ce groupe.", "error")
+            return redirect(url_for("groups.list_groups"))
+
+        status = event.get_status()
+        if status == "future":
+            flash("⚠️ Cet événement n'a pas encore commencé.", "warning")
+            return redirect(url_for("events.event_detail", event_id=event_id))
+        if status == "ended":
+            flash("❌ Cet événement est terminé.", "error")
+            return redirect(url_for("events.event_detail", event_id=event_id))
+
         if quiz_number < 1 or quiz_number > 5:
-            return jsonify({'error': 'Numéro de quiz invalide'}), 400
-        
+            flash("❌ Numéro de quiz invalide.", "error")
+            return redirect(url_for("events.event_detail", event_id=event_id))
+
         quiz = session.query(EventQuiz).filter(
             and_(EventQuiz.event_id == event_id, EventQuiz.quiz_number == quiz_number)
         ).first()
-        
         if not quiz:
-            return jsonify({'error': 'Quiz introuvable'}), 404
-        
-        # ⚠️ VÉRIFICATION 4 : Pas déjà complété
+            flash("Quiz introuvable.", "error")
+            return redirect(url_for("events.event_detail", event_id=event_id))
+
         existing = session.query(EventParticipation).filter(
-            and_(
-                EventParticipation.quiz_id == quiz.id,
-                EventParticipation.user_id == current_user.id
-            )
+            EventParticipation.quiz_id == quiz.id,
+            EventParticipation.user_id == current_user.id,
         ).first()
-        
         if existing:
-            return jsonify({'error': 'Quiz déjà complété'}), 400
-        
-        # ⚠️ VÉRIFICATION 5 : Déverrouillage séquentiel
+            flash("⚠️ Vous avez déjà complété ce quiz.", "warning")
+            return redirect(url_for("events.quiz_result", event_id=event_id, participation_id=existing.id))
+
         completed_count = session.query(EventParticipation).filter(
-            and_(
-                EventParticipation.event_id == event_id,
-                EventParticipation.user_id == current_user.id
-            )
+            EventParticipation.event_id == event_id,
+            EventParticipation.user_id == current_user.id,
         ).count()
-        
-        if quiz_number != completed_count + 1:
-            return jsonify({'error': f'Vous devez compléter le Quiz {completed_count + 1} d\'abord'}), 403
-        
-        # Récupérer les réponses
-        data = request.get_json()
-        answers = data.get('answers', {})
-        time_spent = data.get('time_spent', 0)
-        
-        # Charger les questions et évaluer
+        expected = completed_count + 1
+        if quiz_number != expected:
+            flash(f"🔒 Vous devez d'abord compléter le Quiz {expected}.", "error")
+            return redirect(url_for("events.event_detail", event_id=event_id))
+
         question_ids = json.loads(quiz.questions)
         questions = session.query(Question).filter(Question.id.in_(question_ids)).all()
-        questions_dict = {q.id: q for q in questions}
-        
+        q_dict = {q.id: q for q in questions}
+        questions_ordered = [q_dict[qid] for qid in question_ids if qid in q_dict]
+
+        return render_template("events/play.html", event=event, quiz=quiz, questions=questions_ordered)
+    finally:
+        session.close()
+
+
+@events_bp.route("/<event_id>/submit/<int:quiz_number>", methods=["POST"])
+@login_required
+def submit_quiz(event_id, quiz_number):
+    """Soumettre les réponses d'un quiz d'événement."""
+    session = SessionLocal()
+    try:
+        event = session.get(Event, event_id)
+        if not event:
+            return jsonify({"error": "Événement introuvable"}), 404
+
+        _, _, is_member = _check_group_membership(session, event.group_id, current_user.id)
+        if not is_member:
+            return jsonify({"error": "Accès non autorisé"}), 403
+
+        if event.get_status() != "active":
+            return jsonify({"error": "Événement non actif"}), 403
+
+        if quiz_number < 1 or quiz_number > 5:
+            return jsonify({"error": "Numéro de quiz invalide"}), 400
+
+        quiz = session.query(EventQuiz).filter(
+            and_(EventQuiz.event_id == event_id, EventQuiz.quiz_number == quiz_number)
+        ).first()
+        if not quiz:
+            return jsonify({"error": "Quiz introuvable"}), 404
+
+        if session.query(EventParticipation).filter(
+            EventParticipation.quiz_id == quiz.id,
+            EventParticipation.user_id == current_user.id,
+        ).first():
+            return jsonify({"error": "Quiz déjà complété"}), 400
+
+        completed_count = session.query(EventParticipation).filter(
+            EventParticipation.event_id == event_id,
+            EventParticipation.user_id == current_user.id,
+        ).count()
+        if quiz_number != completed_count + 1:
+            return jsonify({"error": f"Complétez le Quiz {completed_count + 1} d'abord"}), 403
+
+        data = request.get_json()
+        answers = data.get("answers", {})
+        time_spent = data.get("time_spent", 0)
+
+        question_ids = json.loads(quiz.questions)
+        questions = session.query(Question).filter(Question.id.in_(question_ids)).all()
+        q_dict = {q.id: q for q in questions}
+
         correct_count = 0
         detailed_answers = []
-        
         for qid in question_ids:
-            if qid not in questions_dict:
+            if qid not in q_dict:
                 continue
-            
-            question = questions_dict[qid]
+            question = q_dict[qid]
             user_answer = answers.get(qid, "")
-            
-            # Évaluation simplifiée (QCM uniquement pour l'instant)
-            is_correct = False
-            if question.type.value == "qcm":
-                is_correct = user_answer.strip().lower() == question.answer.strip().lower()
-                if is_correct:
-                    correct_count += 1
-            
+            is_correct = question.type.value == "qcm" and user_answer.strip().lower() == question.answer.strip().lower()
+            if is_correct:
+                correct_count += 1
             detailed_answers.append({
-                'question_id': qid,
-                'user_answer': user_answer,
-                'correct_answer': question.answer,
-                'is_correct': is_correct
+                "question_id": qid,
+                "user_answer": user_answer,
+                "correct_answer": question.answer,
+                "is_correct": is_correct,
             })
-        
-        # Calculer le score
-        score = round((correct_count / len(question_ids)) * 100, 1) if len(question_ids) > 0 else 0
-        
-        # Enregistrer la participation
+
         participation = EventParticipation(
             event_id=event_id,
             quiz_id=quiz.id,
             user_id=current_user.id,
-            score=score,
+            correct_count=correct_count,
             total_questions=len(question_ids),
             time_spent=time_spent,
-            answers=json.dumps(detailed_answers)
+            answers=json.dumps(detailed_answers),
         )
         session.add(participation)
         session.commit()
-        
+
+        logger.info(f"Participation : {current_user.username} - quiz {quiz_number} - {correct_count}/{len(question_ids)} ({time_spent}s)")
+
         return jsonify({
-            'success': True,
-            'score': score,
-            'correct': correct_count,
-            'total': len(question_ids),
-            'redirect': url_for('student_events.quiz_result', event_id=event_id, participation_id=participation.id)
+            "success": True,
+            "correct": correct_count,
+            "total": len(question_ids),
+            "redirect": url_for("events.quiz_result", event_id=event_id, participation_id=participation.id),
         })
     finally:
         session.close()
 
 
-@student_events_bp.route('/<event_id>/result/<participation_id>')
+@events_bp.route("/<event_id>/result/<participation_id>")
 @login_required
 def quiz_result(event_id, participation_id):
-    """Afficher le résultat d'un quiz complété"""
+    """Résultat d'un quiz complété."""
     session = SessionLocal()
     try:
         participation = session.get(EventParticipation, participation_id)
-        
         if not participation or participation.user_id != current_user.id:
             flash("Résultat introuvable.", "error")
-            return redirect(url_for('ui.home'))
-        
+            return redirect(url_for("ui.home"))
+
         event = session.get(Event, event_id)
         quiz = session.get(EventQuiz, participation.quiz_id)
-        
-        # Charger les détails des réponses
+
         detailed_answers = json.loads(participation.answers)
-        
-        # Enrichir avec les questions complètes
-        question_ids = [a['question_id'] for a in detailed_answers]
-        questions = session.query(Question).filter(Question.id.in_(question_ids)).all()
-        questions_dict = {q.id: q for q in questions}
-        
+        q_ids = [a["question_id"] for a in detailed_answers]
+        questions = session.query(Question).filter(Question.id.in_(q_ids)).all()
+        q_dict = {q.id: q for q in questions}
+
         for answer in detailed_answers:
-            qid = answer['question_id']
-            if qid in questions_dict:
-                answer['question'] = questions_dict[qid]
-        
-        # Progression
+            qid = answer["question_id"]
+            if qid in q_dict:
+                answer["question"] = q_dict[qid]
+
         completed_count = session.query(EventParticipation).filter(
-            and_(
-                EventParticipation.event_id == event_id,
-                EventParticipation.user_id == current_user.id
-            )
+            EventParticipation.event_id == event_id,
+            EventParticipation.user_id == current_user.id,
         ).count()
-        
         next_quiz = completed_count + 1 if completed_count < 5 else None
-        
-        return render_template('student/event_result.html',
-                              event=event,
-                              quiz=quiz,
-                              participation=participation,
-                              detailed_answers=detailed_answers,
-                              next_quiz=next_quiz)
+
+        return render_template(
+            "events/result.html",
+            event=event,
+            quiz=quiz,
+            participation=participation,
+            detailed_answers=detailed_answers,
+            next_quiz=next_quiz,
+        )
     finally:
         session.close()

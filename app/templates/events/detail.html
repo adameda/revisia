@@ -6,16 +6,16 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- En-tête -->
     <div class="mb-8">
-        <a href="{{ url_for('student_events.group_events', group_id=event.group_id) }}" class="text-blue-600 hover:text-blue-800 mb-2 inline-block">
-            ← Retour aux événements
+        <a href="{{ url_for('events.group_events', group_id=event.group_id) }}"
+           class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition font-semibold mb-2">
+          <span>←</span> <span>Retour aux événements</span>
         </a>
-        <div class="flex items-start justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div class="flex-1">
                 <h1 class="text-3xl font-bold text-gray-900">{{ event.name }}</h1>
-                <p class="text-gray-600">Matière : {{ event.subject.name }}</p>
+                <p class="text-gray-600">Groupe : {{ event.group.name }} | Matière : {{ event.subject.name }}</p>
             </div>
-            <!-- Badge statut -->
-            <div>
+            <div class="flex flex-wrap items-center gap-3">
                 {% set status = event.get_status() %}
                 {% if status == 'future' %}
                 <span class="px-4 py-2 rounded-full text-xs font-bold bg-gray-100 text-gray-700 flex items-center gap-1.5">
@@ -39,10 +39,15 @@
                     <span>EN COURS</span>
                 </span>
                 {% endif %}
+                {% if is_owner %}
+                <button onclick="confirmDeleteEvent()"
+                        class="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition font-semibold text-sm">
+                    Supprimer
+                </button>
+                {% endif %}
             </div>
         </div>
-        <!-- Dates -->
-        <div class="mt-4 flex gap-4 text-sm text-gray-600">
+        <div class="mt-4 flex flex-wrap gap-3 sm:gap-4 text-sm text-gray-600">
             <div class="flex items-center gap-1.5">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -58,7 +63,7 @@
         </div>
     </div>
 
-    <!-- Votre progression -->
+    <!-- Progression personnelle -->
     <div class="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl shadow-lg p-6 text-white mb-8">
         <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
             <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -72,31 +77,27 @@
                 <div class="text-sm opacity-90">Quiz complétés</div>
             </div>
             <div class="text-center">
-                <div class="text-4xl font-bold mb-1">{{ user_total_score | round(1) }}%</div>
-                <div class="text-sm opacity-90">Score total</div>
+                <div class="text-4xl font-bold mb-1">{{ user_correct }} / {{ user_total_q }}</div>
+                <div class="text-sm opacity-90">Bonnes réponses</div>
             </div>
             <div class="text-center">
                 {% if completed_count > 0 %}
-                <div class="text-4xl font-bold mb-1">{{ (user_total_score / completed_count) | round(1) }}%</div>
+                <div class="text-4xl font-bold mb-1">{{ (user_correct / completed_count) | round(1) | int }} / 20</div>
                 {% else %}
                 <div class="text-4xl font-bold mb-1">-</div>
                 {% endif %}
-                <div class="text-sm opacity-90">Moyenne</div>
+                <div class="text-sm opacity-90">Moyenne par quiz</div>
             </div>
         </div>
-
-        <!-- Barre de progression -->
         <div class="mt-6">
             <div class="w-full h-4 bg-white bg-opacity-20 rounded-full overflow-hidden">
                 <div class="h-full bg-white rounded-full transition-all duration-500" 
                      style="width: {{ (completed_count / 5 * 100) | round }}%"></div>
             </div>
         </div>
-
-        <!-- Bouton d'action -->
-        {% if can_play and next_quiz %}
         <div class="mt-6 text-center">
-            <a href="{{ url_for('student_events.play_quiz', event_id=event.id, quiz_number=next_quiz) }}" 
+            {% if can_play and next_quiz %}
+            <a href="{{ url_for('events.play_quiz', event_id=event.id, quiz_number=next_quiz) }}" 
                class="inline-flex items-center gap-2 bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -104,37 +105,23 @@
                 </svg>
                 <span>Jouer au quiz {{ next_quiz }}</span>
             </a>
-        </div>
-        {% elif event.get_status() == 'future' %}
-        <div class="mt-6 text-center">
-            <button disabled 
-                    class="inline-flex items-center gap-2 bg-gray-200 text-gray-500 px-8 py-3 rounded-lg font-bold cursor-not-allowed">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            {% elif status == 'future' %}
+            <button disabled class="inline-flex items-center gap-2 bg-gray-200 text-gray-500 px-8 py-3 rounded-lg font-bold cursor-not-allowed">
                 <span>Événement pas encore commencé</span>
             </button>
-        </div>
-        {% elif event.get_status() == 'ended' %}
-        <div class="mt-6 text-center">
-            <button disabled 
-                    class="inline-flex items-center gap-2 bg-gray-200 text-gray-500 px-8 py-3 rounded-lg font-bold cursor-not-allowed">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            {% elif status == 'ended' %}
+            <button disabled class="inline-flex items-center gap-2 bg-gray-200 text-gray-500 px-8 py-3 rounded-lg font-bold cursor-not-allowed">
                 <span>Événement terminé</span>
             </button>
-        </div>
-        {% elif completed_count >= 5 %}
-        <div class="mt-6 text-center">
+            {% elif completed_count >= 5 %}
             <div class="inline-flex items-center gap-2 bg-green-500 text-white px-8 py-3 rounded-lg font-bold">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Tous les quiz complétés !</span>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 
     <!-- Historique des quiz -->
@@ -165,10 +152,9 @@
                     </div>
                     <div class="flex items-center gap-6">
                         <div class="text-right">
-                            <div class="text-2xl font-bold text-blue-600">{{ participation.score | round(1) }}%</div>
-                            <div class="text-sm text-gray-500">{{ (participation.score * participation.total_questions / 100) | round | int }} / {{ participation.total_questions }}</div>
+                            <div class="text-2xl font-bold text-blue-600">{{ participation.correct_count }} / {{ participation.total_questions }}</div>
                         </div>
-                        <a href="{{ url_for('student_events.quiz_result', event_id=event.id, participation_id=participation.id) }}"
+                        <a href="{{ url_for('events.quiz_result', event_id=event.id, participation_id=participation.id) }}"
                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm">
                             Voir détails
                         </a>
@@ -197,7 +183,7 @@
                 <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rang</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Étudiant</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Membre</th>
                         <th class="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Quiz</th>
                         <th class="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Score total</th>
                     </tr>
@@ -206,17 +192,15 @@
                     {% for item in ranking %}
                     <tr class="{% if item.is_current_user %}bg-blue-50{% else %}hover:bg-gray-50{% endif %} transition-colors {% if item.rank <= 3 %}border-l-4 {% if item.rank == 1 %}border-yellow-400{% elif item.rank == 2 %}border-gray-400{% else %}border-orange-400{% endif %}{% endif %}">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                {% if item.rank == 1 %}
-                                <span class="text-2xl font-bold text-yellow-500">1er</span>
-                                {% elif item.rank == 2 %}
-                                <span class="text-2xl font-bold text-gray-500">2e</span>
-                                {% elif item.rank == 3 %}
-                                <span class="text-2xl font-bold text-orange-500">3e</span>
-                                {% else %}
-                                <span class="text-xl font-semibold text-gray-600">{{ item.rank }}</span>
-                                {% endif %}
-                            </div>
+                            {% if item.rank == 1 %}
+                            <span class="text-2xl font-bold text-yellow-500">1er</span>
+                            {% elif item.rank == 2 %}
+                            <span class="text-2xl font-bold text-gray-500">2e</span>
+                            {% elif item.rank == 3 %}
+                            <span class="text-2xl font-bold text-orange-500">3e</span>
+                            {% else %}
+                            <span class="text-xl font-semibold text-gray-600">{{ item.rank }}</span>
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-2">
@@ -227,11 +211,16 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <span class="font-semibold text-gray-900">{{ item.quiz_count }}</span>
-                            <span class="text-gray-500"> / 5</span>
+                            <div class="inline-flex items-center gap-2">
+                                <span class="font-semibold text-gray-900">{{ item.quiz_count }}</span>
+                                <span class="text-gray-500">/ 5</span>
+                            </div>
+                            <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden mt-1 mx-auto">
+                                <div class="h-full bg-blue-600 rounded-full" style="width: {{ (item.quiz_count / 5 * 100) | round }}%"></div>
+                            </div>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <span class="text-lg font-bold text-blue-600">{{ item.total_score | round(1) }}%</span>
+                            <span class="text-lg font-bold text-blue-600">{{ item.total_correct }} / {{ item.total_questions }}</span>
                         </td>
                     </tr>
                     {% endfor %}
@@ -251,4 +240,23 @@
         {% endif %}
     </div>
 </div>
+
+{% if is_owner %}
+<script>
+function confirmDeleteEvent() {
+    if (confirm('Supprimer cet événement ?\n\nToutes les participations et scores seront supprimés. Cette action est irréversible.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("events.delete_event", event_id=event.id) }}';
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrf_token';
+        csrf.value = document.querySelector('meta[name="csrf-token"]').content;
+        form.appendChild(csrf);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endif %}
 {% endblock %}

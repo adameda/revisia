@@ -5,10 +5,10 @@
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- En-tête fixe -->
-    <div class="bg-white rounded-xl shadow-md p-6 mb-8 sticky top-4 z-10">
+    <div class="bg-white rounded-xl shadow-md p-4 sm:p-6 mb-6 sm:mb-8 sticky top-16 sm:top-4 z-10">
         <div class="flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">{{ event.name }}</h1>
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900">{{ event.name }}</h1>
                 <p class="text-gray-600">Quiz {{ quiz.quiz_number }} / 5</p>
             </div>
             <div class="text-right">
@@ -16,8 +16,6 @@
                 <div class="text-sm text-gray-500">Temps indicatif</div>
             </div>
         </div>
-        
-        <!-- Barre de progression -->
         <div class="mt-4">
             <div class="flex justify-between text-sm text-gray-600 mb-2">
                 <span>Question <span id="currentQuestion">1</span> / {{ questions | length }}</span>
@@ -40,15 +38,11 @@
                     </div>
                     <div class="flex-1">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ question.question }}</h3>
-                        
                         {% if question.type.value == 'qcm' %}
-                        <!-- QCM -->
                         <div class="space-y-3">
                             {% for choice in question.choices %}
                             <label class="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all group">
-                                <input type="radio" 
-                                       name="question_{{ question.id }}" 
-                                       value="{{ choice }}"
+                                <input type="radio" name="question_{{ question.id }}" value="{{ choice }}"
                                        class="w-5 h-5 text-blue-600 focus:ring-2 focus:ring-blue-500"
                                        onchange="updateProgress()">
                                 <span class="ml-3 text-gray-900 group-hover:text-blue-900 font-medium">{{ choice }}</span>
@@ -56,9 +50,7 @@
                             {% endfor %}
                         </div>
                         {% else %}
-                        <!-- Question ouverte -->
-                        <textarea name="question_{{ question.id }}"
-                                  rows="4"
+                        <textarea name="question_{{ question.id }}" rows="4"
                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                                   placeholder="Votre réponse..."
                                   oninput="updateProgress()"></textarea>
@@ -69,22 +61,13 @@
             {% endfor %}
         </div>
 
-        <!-- Bouton de soumission -->
         <div class="mt-8 bg-white rounded-xl shadow-md p-6">
             <div class="flex items-center justify-between">
                 <div class="text-sm text-gray-600">
-                    <p class="font-semibold mb-1 flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                        </svg>
-                        <span>Attention</span>
-                    </p>
+                    <p class="font-semibold mb-1">Attention</p>
                     <p>Une fois soumis, vous ne pourrez pas modifier vos réponses.</p>
                 </div>
-                <button type="button" 
-                        onclick="submitQuiz()"
-                        id="submitBtn"
-                        disabled
+                <button type="button" onclick="submitQuiz()" id="submitBtn" disabled
                         class="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -101,7 +84,6 @@ let startTime = Date.now();
 let timerInterval;
 let totalQuestions = {{ questions | length }};
 
-// Timer
 function updateTimer() {
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
     const minutes = Math.floor(elapsed / 60);
@@ -109,29 +91,18 @@ function updateTimer() {
     document.getElementById('timer').textContent = 
         `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
-
 timerInterval = setInterval(updateTimer, 1000);
 
-// Progression
 function updateProgress() {
     const form = document.getElementById('quizForm');
     const formData = new FormData(form);
     let answeredCount = 0;
-    
-    // Compter les réponses
     {% for question in questions %}
     const answer{{ loop.index }} = formData.get('question_{{ question.id }}');
-    if (answer{{ loop.index }} && answer{{ loop.index }}.trim() !== '') {
-        answeredCount++;
-    }
+    if (answer{{ loop.index }} && answer{{ loop.index }}.trim() !== '') answeredCount++;
     {% endfor %}
-    
-    // Mettre à jour l'affichage
     document.getElementById('answeredCount').textContent = answeredCount;
-    const progress = (answeredCount / totalQuestions) * 100;
-    document.getElementById('progressBar').style.width = progress + '%';
-    
-    // Activer/désactiver le bouton de soumission
+    document.getElementById('progressBar').style.width = (answeredCount / totalQuestions * 100) + '%';
     const submitBtn = document.getElementById('submitBtn');
     if (answeredCount === totalQuestions) {
         submitBtn.disabled = false;
@@ -142,89 +113,55 @@ function updateProgress() {
     }
 }
 
-// Soumission
 function submitQuiz() {
-    if (!confirm('Êtes-vous sûr de vouloir soumettre vos réponses ? Vous ne pourrez pas les modifier après.')) {
-        return;
-    }
-    
+    if (!confirm('Soumettre vos réponses ? Vous ne pourrez pas les modifier.')) return;
     const form = document.getElementById('quizForm');
     const formData = new FormData(form);
-    
-    // Construire l'objet answers
     const answers = {};
     {% for question in questions %}
-    const answer{{ loop.index }} = formData.get('question_{{ question.id }}');
-    if (answer{{ loop.index }}) {
-        answers['{{ question.id }}'] = answer{{ loop.index }};
-    }
+    const a{{ loop.index }} = formData.get('question_{{ question.id }}');
+    if (a{{ loop.index }}) answers['{{ question.id }}'] = a{{ loop.index }};
     {% endfor %}
-    
-    // Calculer le temps passé
     const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-    
-    // Désactiver le bouton et afficher un message
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><circle class="opacity-75" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-dasharray="32" stroke-dashoffset="32"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg><span>Envoi en cours...</span>';
-    
-    // Envoyer au serveur
-    fetch('{{ url_for("student_events.submit_quiz", event_id=event.id, quiz_number=quiz.quiz_number) }}', {
+    submitBtn.innerHTML = '<span>Envoi en cours...</span>';
+
+    fetch('{{ url_for("events.submit_quiz", event_id=event.id, quiz_number=quiz.quiz_number) }}', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            answers: answers,
-            time_spent: timeSpent
-        })
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        body: JSON.stringify({ answers: answers, time_spent: timeSpent })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             clearInterval(timerInterval);
-            // Désactiver l'alerte de navigation AVANT de rediriger
             window.removeEventListener('beforeunload', preventUnload);
             window.location.href = data.redirect;
         } else {
             alert('Erreur : ' + (data.error || 'Une erreur est survenue'));
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>Soumettre mes réponses</span>';
+            submitBtn.innerHTML = '<span>Soumettre mes réponses</span>';
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Une erreur est survenue lors de l\'envoi des réponses.');
+        alert('Une erreur est survenue.');
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>Soumettre mes réponses</span>';
+        submitBtn.innerHTML = '<span>Soumettre mes réponses</span>';
     });
 }
 
-// Avertissement avant de quitter la page (seulement si pas encore soumis)
-function preventUnload(e) {
-    e.preventDefault();
-    e.returnValue = '';
-}
+function preventUnload(e) { e.preventDefault(); e.returnValue = ''; }
 window.addEventListener('beforeunload', preventUnload);
-
-// Observer pour mettre en évidence la question actuelle
-const observerOptions = {
-    root: null,
-    rootMargin: '-100px',
-    threshold: 0.5
-};
 
 const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
         if (entry.isIntersecting) {
-            const questionNumber = entry.target.dataset.questionNumber;
-            document.getElementById('currentQuestion').textContent = questionNumber;
+            document.getElementById('currentQuestion').textContent = entry.target.dataset.questionNumber;
         }
     });
-}, observerOptions);
-
-document.querySelectorAll('.question-card').forEach(card => {
-    observer.observe(card);
-});
+}, { root: null, rootMargin: '-100px', threshold: 0.5 });
+document.querySelectorAll('.question-card').forEach(card => observer.observe(card));
 </script>
 {% endblock %}

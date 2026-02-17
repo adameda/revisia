@@ -7,6 +7,7 @@
   </h1>
 
   <form method="POST" class="space-y-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="email" name="email" placeholder="Email" required
            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
     <input type="password" name="password" placeholder="Mot de passe" required
@@ -18,12 +19,14 @@
     </button>
   </form>
 
+  {% if registration_enabled %}
   <p class="mt-6 text-center text-sm text-gray-600">
     Pas encore de compte ? 
     <a href="{{ url_for('auth.register') }}" class="text-blue-600 font-medium hover:underline">
       Créer un compte
     </a>
   </p>
+  {% endif %}
 </div>
 
 <style>

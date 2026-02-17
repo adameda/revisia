@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Résultats - Quiz {{ quiz.quiz_number }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Score principal -->
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl shadow-lg p-8 text-white text-center mb-8">
+        <div class="flex justify-center mb-4">
+            {% if participation.correct_count >= 16 %}
+            <svg class="w-20 h-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+            {% elif participation.correct_count >= 12 %}
+            <svg class="w-20 h-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {% elif participation.correct_count >= 8 %}
+            <svg class="w-20 h-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            {% else %}
+            <svg class="w-20 h-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            {% endif %}
+        </div>
+        <h1 class="text-4xl font-bold mb-2">{{ participation.correct_count }} / {{ participation.total_questions }}</h1>
+        <p class="text-xl opacity-90 mb-6">
+            bonnes réponses
+        </p>
+        <div class="inline-block bg-white bg-opacity-20 rounded-lg px-6 py-3">
+            <p class="text-sm opacity-90">Quiz {{ quiz.quiz_number }} de {{ event.name }}</p>
+        </div>
+    </div>
+
+    <!-- Message -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-8 text-center">
+        {% if participation.correct_count >= 16 %}
+        <h2 class="text-2xl font-bold text-green-600 mb-2">Excellent travail !</h2>
+        <p class="text-gray-600">Vous maîtrisez parfaitement ce sujet. Continuez ainsi !</p>
+        {% elif participation.correct_count >= 12 %}
+        <h2 class="text-2xl font-bold text-blue-600 mb-2">Bien joué !</h2>
+        <p class="text-gray-600">Bon score ! Quelques révisions et vous serez au top.</p>
+        {% elif participation.correct_count >= 8 %}
+        <h2 class="text-2xl font-bold text-orange-600 mb-2">Continuez vos efforts !</h2>
+        <p class="text-gray-600">Vous êtes sur la bonne voie. Révisez et réessayez !</p>
+        {% else %}
+        <h2 class="text-2xl font-bold text-red-600 mb-2">Revisitez le cours</h2>
+        <p class="text-gray-600">N'abandonnez pas ! Révisez le cours et vous progresserez.</p>
+        {% endif %}
+    </div>
+
+    <!-- Statistiques -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="text-3xl font-bold text-green-600 mb-2">
+                {{ participation.correct_count }}
+            </div>
+            <div class="text-sm text-gray-600">Réponses correctes</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="text-3xl font-bold text-red-600 mb-2">
+                {{ participation.total_questions - participation.correct_count }}
+            </div>
+            <div class="text-sm text-gray-600">Réponses incorrectes</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="text-3xl font-bold text-blue-600 mb-2">
+                {% if participation.time_spent %}
+                {{ (participation.time_spent // 60) }}:{{ '%02d' | format(participation.time_spent % 60) }}
+                {% else %}N/A{% endif %}
+            </div>
+            <div class="text-sm text-gray-600">Temps passé</div>
+        </div>
+    </div>
+
+    <!-- Détails des réponses -->
+    <div class="bg-white rounded-xl shadow-md overflow-hidden mb-8">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h2 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <svg class="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>Détail des réponses</span>
+            </h2>
+        </div>
+        <div class="p-6 space-y-6">
+            {% for answer in detailed_answers %}
+            {% set question = answer.question %}
+            <div class="border-l-4 {% if answer.is_correct %}border-green-500 bg-green-50{% else %}border-red-500 bg-red-50{% endif %} rounded-r-lg p-4">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-10 h-10 {% if answer.is_correct %}bg-green-500{% else %}bg-red-500{% endif %} rounded-full flex items-center justify-center text-white">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          {% if answer.is_correct %}
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                          {% else %}
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                          {% endif %}
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">{{ question.question }}</h3>
+                        <div class="mb-3">
+                            <p class="text-sm font-semibold text-gray-700 mb-1">Votre réponse :</p>
+                            <p class="{% if answer.is_correct %}text-green-700{% else %}text-red-700{% endif %} font-medium">
+                                {{ answer.user_answer }}
+                            </p>
+                        </div>
+                        {% if not answer.is_correct %}
+                        <div class="mb-3">
+                            <p class="text-sm font-semibold text-gray-700 mb-1">Réponse correcte :</p>
+                            <p class="text-green-700 font-medium">{{ answer.correct_answer }}</p>
+                        </div>
+                        {% endif %}
+                        {% if question.explanation %}
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            <p class="text-sm font-semibold text-gray-700 mb-1">Explication :</p>
+                            <p class="text-sm text-gray-600">{{ question.explanation }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex flex-col sm:flex-row gap-4">
+        {% if next_quiz %}
+        <a href="{{ url_for('events.play_quiz', event_id=event.id, quiz_number=next_quiz) }}"
+           class="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 rounded-lg font-bold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg text-center inline-flex items-center justify-center gap-2">
+            <span>Quiz {{ next_quiz }} suivant</span>
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('events.event_detail', event_id=event.id) }}"
+           class="{% if next_quiz %}flex-1{% else %}w-full{% endif %} bg-gray-200 text-gray-700 px-6 py-4 rounded-lg font-bold hover:bg-gray-300 transition-colors text-center inline-flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span>Voir le classement</span>
+        </a>
+    </div>
+
+    <div class="mt-6 text-center">
+        <a href="{{ url_for('events.group_events', group_id=event.group_id) }}"
+           class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition font-semibold">
+          <span>←</span> <span>Retour aux événements</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
